@@ -6,7 +6,7 @@ import 'react-calendar/dist/Calendar.css'
 import { useEffect, useState } from 'react'
 import { Value } from 'react-calendar/dist/cjs/shared/types'
 
-const DEFAULT_HOST = 'http://localhost:3001'
+const DEFAULT_HOST = "https://airjam.co";
 const CALENDAR_CONFIG_ENDPOINT = '/s/calendar?id='
 const DEFAULT_TIME_FORMAT: Intl.DateTimeFormatOptions = {
   hour: '2-digit',
