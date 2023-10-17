@@ -6,12 +6,15 @@ import 'react-calendar/dist/Calendar.css'
 import { useEffect, useState } from 'react'
 import { Value } from 'react-calendar/dist/cjs/shared/types'
 
-const DEFAULT_HOST = "https://airjam.co";
+const DEFAULT_HOST = 'https://airjam.co';
 const CALENDAR_CONFIG_ENDPOINT = '/s/calendar?id='
 const DEFAULT_TIME_FORMAT: Intl.DateTimeFormatOptions = {
   hour: '2-digit',
   minute: '2-digit',
   hour12: true
+}
+const HOUR_ONLY: Intl.DateTimeFormatOptions = {
+  hour: 'numeric',
 }
 const DEFAULT_DESCRIPTION_LENGTH_CUTOFF = 30
 
@@ -82,15 +85,12 @@ export const Calendar = ({
   const onChange = (newDate: Value) => {
     if (newDate) {
       const newStartTime: Date = new Date(newDate.toString())
-      console.log('before: ' + startTime)
-      // change
       setStartTime(newStartTime)
       if (isMounted) fetchCalendar(newStartTime)
     }
   }
 
   const fetchDay = (newDate: Date) => {
-    console.log('moving to: ' + newDate)
     setStartTime(newDate)
     if (isMounted) fetchCalendar(newDate)
   }
@@ -98,6 +98,7 @@ export const Calendar = ({
   useEffect(() => {
     if (!isMounted) {
       setIsMounted(true)
+      if (showDate) setStartTime(new Date(showDate))
       if (startDate) {
         if (showEndDate && viewAs && viewAs === ViewType.List) {
           fetchCalendar(startDate, showEndDate)
@@ -196,7 +197,7 @@ export const Calendar = ({
     )
   }
 
-  const renderCalendarByLocation = () => {
+  const renderDayCalendarByLocation = () => {
     if (!events || !events.length)
       return (
         <div className='calendar-list-container'>
@@ -204,37 +205,113 @@ export const Calendar = ({
         </div>
       )
 
+    let earliestStartTime: Date | undefined = undefined;
+    let latestEndTime: Date | undefined = undefined;
     const eventsByLocations: Map<String, Event[]> = new Map<String, Event[]>()
     for (let i = 0; i < events.length; i++) {
       const location = events[i].location ? events[i].location : ''
+      if (events[i].start && !events[i].allDay) {
+        const start = new Date(events[i].start)
+        if (start > new Date(0)) {
+          if ((!earliestStartTime) || (start < earliestStartTime)) {
+            earliestStartTime = start
+          }
+        }
+      }
+      if (events[i].end && !events[i].allDay) {
+        const end = new Date(events[i].end)
+        if (end > new Date(0)) {
+          if ((!latestEndTime) || (end > latestEndTime)) {
+            latestEndTime = end
+          }
+        }
+      }
       let locationEvents: Event[] = []
       if (eventsByLocations.has(location))
         locationEvents = eventsByLocations.get(location)!
       locationEvents.push(events[i])
       eventsByLocations.set(location, locationEvents)
     }
-    console.log(eventsByLocations)
-
     const uniqueLocations: String[] = []
     for (const entry of Array.from(eventsByLocations.entries())) {
       const key = entry[0]
       uniqueLocations.push(key)
     }
     uniqueLocations.sort()
+    const earliestStartHour: number = earliestStartTime ? earliestStartTime.getHours() : 0
+    const latestEndHour: number = latestEndTime ? latestEndTime.getHours() : 23
+    const someArrayWith24Elements = ['','','','','','','','','','','','','','','','','','','','','','','','']
+    const someArrayForMapLoop = someArrayWith24Elements.slice(earliestStartHour, latestEndHour + 1)
+    const numScheduleStopsInMinutes: number = (latestEndHour - earliestStartHour + 1) * 60
     return (
       <div className='calendar-location-list-container'>
-        {uniqueLocations.map(function (key, idx) {
-          console.log(key + ':' + idx)
-          if (!eventsByLocations.has(key)) return ''
+        <div className='grid-timeline' style={{gridTemplateRows: 'repeat(' + (numScheduleStopsInMinutes / 60) + ', 60px)'}}>
+          <div className='grid-spacer'></div>
+          {
+            someArrayForMapLoop.map(function (key, idx) {
+              let timeMarkerRenderDate = new Date()
+              timeMarkerRenderDate.setHours(idx + earliestStartHour)
+              return <div key={'time-marker-' + idx + key} className='time-marker'>{timeMarkerRenderDate.toLocaleTimeString([], HOUR_ONLY)}</div>
+            })
+          }
+        </div>
+        <div className='schedule-entries'>
+          {uniqueLocations.map(function (key, idx) {
+            if (!eventsByLocations.has(key)) return ''
+            return (
+              <div key={'location' + idx} className='calendar-location-container'>
+                <div className='location-header'>
+                  {key}
+                  {renderGridAllDayEvents(eventsByLocations.get(key)!)}
+                </div>
+                {renderGridTimedEvents(eventsByLocations.get(key)!, earliestStartHour, numScheduleStopsInMinutes)}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+    const renderGridAllDayEvents = (events: Event[]) => {
+    return (
+      <div className='all-day-events'>
+        {events.filter(e => e.allDay).map(function (e, idx) {
+          const renderedEvent: React.JSX.Element = renderEventFunc ? renderEventFunc(e, idx) : renderEvent(e, idx)
           return (
-            <div key={'location' + idx} className='cleandar-location-container'>
-              <div className='location-header'>{key}</div>
-              {renderEvents(eventsByLocations.get(key)!)}
+            <div className='schedule-event-container'>
+              {renderedEvent}
             </div>
           )
         })}
       </div>
     )
+  }
+
+  const renderGridTimedEvents = (events: Event[], earliestStartHour: number, numScheduleStopsInMinutes: number) => {
+    const earliestStartMinute = earliestStartHour * 60
+    return (
+      <div className='schedule-events' style={{gridTemplateRows: 'repeat(' + numScheduleStopsInMinutes + ', 1px)'}}>
+        {events.filter(e => (e.start && e.end && !e.allDay)).map(function (e, idx) {
+          const renderedEvent: React.JSX.Element = renderEventFunc ? renderEventFunc(e, idx) : renderEvent(e, idx)
+          const startTimeMinute = minutesSinceMidnight(e.start) - earliestStartMinute
+          const endTimeMinute = minutesSinceMidnight(e.end) - earliestStartMinute
+          return (
+            <div className='schedule-event-container' style={{gridRowStart: startTimeMinute, gridRowEnd: endTimeMinute}}>
+              {renderedEvent}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const minutesSinceMidnight = (dateObj: Date) => {
+    if (!dateObj) return 0;
+    const date = new Date(dateObj)
+    var minutes = date.getMinutes();
+    var hours = date.getHours();
+    return (60 * hours) + minutes;
   }
 
   const renderEventsByDay = (events: Event[]) => {
@@ -336,11 +413,11 @@ export const Calendar = ({
 
   const renderDayListWithDaySelector = () => {
     return (
-      <div className='calendar-list-container'>
+      <div className='calendar-list-container calendar-list-container-day-selector'>
         <div className='day-selector'>
-          <button onClick={() => fetchDay(addDays(startTime, -1))}>&lt;</button>
           {startTime.toDateString()}
           <button onClick={() => fetchDay(addDays(startTime, 1))}>&gt;</button>
+          <button onClick={() => fetchDay(addDays(startTime, -1))}>&lt;</button>
         </div>
         {!events || !events.length ? (
           <span className='no-events'>No events scheduled for today</span>
@@ -354,7 +431,7 @@ export const Calendar = ({
 
   const renderDayList = () => {
     return (
-      <div className='calendar-list-container'>
+      <div className='calendar-list-container calendar-list-container-day-view'>
         {!events || !events.length ? (
           <span className='no-events'>No events scheduled for today</span>
         ) : (
@@ -383,7 +460,7 @@ export const Calendar = ({
     if (viewAs === ViewType.CalendarView) return renderCalendarView()
     if (viewAs === ViewType.DayList) return renderDayListWithDaySelector()
     if (viewAs === ViewType.DayView) return renderDayList()
-    if (viewAs === ViewType.DayViewByLocation) return renderCalendarByLocation()
+    if (viewAs === ViewType.DayViewByLocation) return renderDayCalendarByLocation()
     return renderList()
   }
 
