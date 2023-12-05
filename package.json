@@ -1,6 +1,6 @@
 {
   "name": "@airjam/react-calendar",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "React component for AirJam&#x27;s Calendar component",
   "author": "mjlee1983",
   "license": "MIT",
@@ -66,7 +66,6 @@
     "dist"
   ],
   "dependencies": {
-    "@airjam/types": "^0.0.91",
     "@popperjs/core": "^2.11.8",
     "@types/bootstrap": "^5.2.9",
     "@types/react-bootstrap": "^0.32.35",
@@ -80,7 +79,6 @@
     "react-bootstrap-validation": "^0.1.11",
     "react-calendar": "^4.1.0",
     "react-is": ">=17.0.2",
-    "reactjs-popup": "^2.0.6",
     "timezones.json": "^1.7.1"
   }
 }
