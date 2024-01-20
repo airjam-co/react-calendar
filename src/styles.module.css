@@ -57,6 +57,50 @@
   font-size: 13px;
 }
 
+.airjam-calendar-view .calendar-view-container .availabilities {
+  text-align: center;
+}
+
+.airjam-calendar-view .calendar-view-container .availability-resource-container .empty {
+  color: #999;
+  margin: 10px;
+  font-size: 14px;
+}
+
+
+.airjam-calendar-view .calendar-view-container .availability-resource-name {
+  margin: 10px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.airjam-calendar-view .calendar-view-container .reserve-slot-button {
+  margin: 10px;
+  width: 50%;
+  max-width: 200px;
+}
+
+.airjam-calendar-view .calendar-view-container .timezone-selector-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.airjam-calendar-view .calendar-view-container .timezone-selector-block .header,
+.airjam-calendar-view .calendar-view-container .timezone-selector-block .timezone-selector {
+  float: left;
+}
+
+.book-resource-popup-content {
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.book-resource-popup-content .booking-timezone .timezone-selector .dropdown-toggle {
+  margin-top: -10px;
+  padding: 0;
+}
+
 .calendar-list-container-day-view .event-block {
   border: 0;
   border-left: 0;

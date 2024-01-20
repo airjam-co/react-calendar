@@ -1,4 +1,4 @@
-import { Calendar } from '.'
+import { Calendar } from './Calendar'
 
 describe('Calendar', () => {
   it('is truthy', () => {
