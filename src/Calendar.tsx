@@ -179,6 +179,8 @@ export const Calendar = ({
   }
 
   const renderCalendarBook = () => {
+    // TODO figure out a way to place dots on top of dates that have availability
+
     return (
       <div className='calendar-view-container'>
         <span className='calendar-block'>
@@ -199,8 +201,8 @@ export const Calendar = ({
             timezone={timezone.toString()}
             bookingResult={bookingResult}
             onClose={() => setBookingResult(undefined)}
-          /> : ""}
-        {bookingDialog ? reserveDialog(bookingDialog) : ""}
+          /> : <div className="empty-modal"></div>}
+        {bookingDialog ? reserveDialog(bookingDialog) : <div className="empty-modal">no modal for you</div>}
       </div>
     )
   }
@@ -210,13 +212,16 @@ export const Calendar = ({
     const availableTimes = <AvailabilitiesForADay
       timezone={timezone.toString()}
       availability={availability}
-      onPress={(requestResource) => setBookingDialog(requestResource)}
+      startTimeUtc={startTime}
+      onPress={(requestResource) => {
+        setBookingDialog(requestResource);
+      }}
     />;
     if (availableTimes) return availableTimes!;
-    return <div>1</div>;
+    return <div></div>;
   }
 
-  const reserveDialog = (resource: BookingRequestResource): React.ReactNode => {
+  const reserveDialog = (resource: BookingRequestResource) => {
     if (!resource || !resource.startTimeUtc || !resource.endTimeUtc || !resource.resource) return <div className='dialog-content'></div>
     return <ReservationModal
       componentId={id}

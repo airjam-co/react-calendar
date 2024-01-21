@@ -47,6 +47,7 @@ export const fetchReservationTerms = async (
         // backfill start dates for compatibility
         if (response.resources) {
           for (let i = 0; i < response.resources.length; i++) {
+            if (!response.resources[i].availableEvents) continue;
             for (
               let j = 0;
               j < response.resources[i].availableEvents.length;

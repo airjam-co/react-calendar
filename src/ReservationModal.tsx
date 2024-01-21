@@ -45,7 +45,7 @@ export const ReservationModal = ({
     const endTime = new Date(resource.endTimeUtc)
     type BookingRequestInternalKey = keyof BookingRequestInternal;
     if (!startTime || !endTime) return <div className='dialog-content'></div>
-    return <Modal className='book-resource-popup-content' onHide={() => { closeModal() }}>
+    return <Modal show={true} className='book-resource-popup-content' onHide={() => { closeModal() }}>
       <Modal.Header>
         <Modal.Title>
           {resource.resource.name}
@@ -73,7 +73,6 @@ export const ReservationModal = ({
               bookingRequest[field.id as BookingRequestInternalKey] = field.value
             }
           }
-          console.log(bookingRequest)
           if (submitPressed) {
             submitPressed(resource, bookingRequest);
           }

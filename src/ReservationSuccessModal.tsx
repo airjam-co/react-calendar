@@ -20,7 +20,7 @@ export const ReservationSuccessModal = ({
   }, []);
 
   const reserveSuccessDialog = () => {
-    return <Modal show={bookingResult !== undefined} className='booking-result' onHide={() => { if (onClose) onClose(); }}>
+    return <Modal show={true} className='booking-result' onHide={() => { if (onClose) onClose(); }}>
       <Modal.Header>
         <Modal.Title>
           Booking confirmed

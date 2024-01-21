@@ -10,36 +10,48 @@ import { Button } from 'react-bootstrap';
 interface Props {
   timezone: string;
   availability: CalendarBookingAvailability;
+  startTimeUtc: Date;
   onPress?: (dialogResource: BookingRequestResource) => void;
 }
 
-export const AvailabilitiesForADay = ({ availability, timezone, onPress }: Props) => {
+export const AvailabilitiesForADay = ({ availability, startTimeUtc, timezone, onPress }: Props) => {
   React.useEffect(() => {});
 
   const renderAvailableTimes = () => {
-    if (!availability || !availability.resources) return
-      <div className='availabilities'>
-        <span className='empty'>There are no availabilities for the given time frame</span>
-      </div>;
+    if (!availability || !availability.resources) return <div className='availabilities'><span className='empty'>There are no availabilities for the given time frame</span></div>;
     return <div className='availabilities'>
         {availability.resources.map(function (resource, idx) {
           return <div className='availability-resource-container' key={'availability-resource-container-' + idx}>
             <div className='availability-resource-name'>
               {resource.name}
             </div>
-            {renderAvailableSlots(resource)}
+            {renderAvailableSlotsForADay(resource)}
           </div>
         })}
     </div>
   }
 
-  const renderAvailableSlots = (resource: BookingResource) => {
-    if (!resource || !resource.availableTimes || !resource.availableTimes.length)
+  const renderAvailableSlotsForADay = (resource: BookingResource) => {
+    // filter available times to current day only
+    const relevantTimes: TimeRange[] = resource.availableTimes.filter((et) => {
+      // true if it's the same locale date as the startTime
+      if (!et || !et.startTimeUtc) {
+        return false;
+      }
+      const sTime = new Date(et.startTimeUtc);
+      return (
+        sTime.getFullYear() === startTimeUtc.getUTCFullYear() &&
+        sTime.getMonth() === startTimeUtc.getMonth() &&
+        sTime.getDay() === startTimeUtc.getDay()
+      );
+    });
+
+    if (!relevantTimes.length)
       return <div className='availability-resource' key={'available-slots-' + resource._id}>
         <span className='empty'>There are no availabilities for this resource</span>
       </div>
     return <div className='availability-resource' key={'available-slots-' + resource._id}>
-      {resource.availableTimes.map(function (timeSlot, idx) {
+      {relevantTimes.map(function (timeSlot, idx) {
         return renderSlot(resource, timeSlot, idx + '')
       })}
     </div>
