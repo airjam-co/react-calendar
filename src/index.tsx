@@ -1,5 +1,4 @@
 export * from './AvailabilitiesForADay';
-export * from './BookingRequestInternal';
 export * from './BookingRequestResource';
 export * from './BookingResponse';
 export * from './BookingResultPage';
@@ -9,7 +8,7 @@ export * from './EventDetail';
 export * from './EventDetailList';
 export * from './EventListGroupedByDay';
 export * from './Props';
-export * from './ReservationModal';
+export * from './ReservationModalWrapper';
 export * from './ReservationSuccessModal';
 export * from './thunk';
 export * from './timezone_data';

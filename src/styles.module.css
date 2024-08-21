@@ -1,4 +1,7 @@
 /* add css module styles here (optional) */
+.hideImportant {
+  display: none !important;
+}
 .calendar-day {
   width: 100%;
 }
@@ -379,4 +382,107 @@
   display: inline;
   font-size: 3rem;
   font-weight: 100;
+}
+
+.resource-map-box {
+  width: 100%;
+  height: 500px;
+  border-radius: 10px;
+}
+
+.map-control-btn {
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 5px;
+  font-size: 16px;
+  border: none;
+  font-weight: 500;
+  background-color: #ffffff;
+  box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2);
+}
+
+.resource-block {
+  padding: 0;
+}
+
+.resource-block-container {
+  box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2);
+  margin: 5px;
+  border-radius: 5px;
+}
+
+.resource-media {
+  min-height: 200px;
+  max-height: 200px;
+  height: 200px;
+}
+
+.resource-media img {
+  width: 100%;
+  border-radius: 5px 5px 0 0;
+  object-fit: cover;
+  height: 200px;
+  min-height: 200px;
+  max-height: 200px;
+}
+
+.resource-block .description-block {
+  text-align: left;
+  padding: 10px;
+}
+
+.payment-total {
+  font-weight: bold;
+}
+
+.submit-container {
+  display: block;
+}
+
+.modal-content h3 {
+  margin-top: 20px;
+}
+
+.availabilities-label {
+  font-weight: bold;
+  margin-top: 10px;
+  margin-bottom: 5px;
+}
+
+.operating-hour-control-container {
+  display: flex;
+}
+
+.operating-hour-control-time-selector {
+  display: flex;
+  margin-bottom: 6px;
+}
+
+.operating-hour-control-time-selector-container {
+  margin-bottom: 5px;
+}
+
+.operating-hour-control-time-selector button {
+  margin-left: 5px !important;
+  height: 37px;
+  width: 37px;
+  border-radius: 18px !important;
+  padding: 10px !important;
+}
+
+.operating-hour-control-actions {
+  display: flex;
+}
+
+.operating-hour-control-actions button {
+  height: 37px;
+  width: 37px;
+  border-radius: 18px !important;
+  padding: 10px !important;
+  margin-left: 5px !important;
+}
+
+.operating-hour-control-day {
+  margin-right: 10px;
+  width: 40px;
 }
