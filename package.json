@@ -12,8 +12,8 @@
     "node": ">=10"
   },
   "scripts": {
-    "build": "microbundle --no-compress --format modern,cjs --jsx React.createElement --output ./dist -i ./dist/react-calendar.js",
-    "start": "microbundle watch --no-compress --format modern,cjs --jsx React.createElement --output ./dist -i ./dist/react-calendar.js",
+    "build": "microbundle --no-compress --format modern,cjs --jsx React.createElement -o ./dist -i ./src/index.tsx",
+    "start": "microbundle watch --no-compress --format modern,cjs --jsx React.createElement -o ./dist -i ./src/index.tsx",
     "prepare": "run-s build",
     "test": "run-s test:unit test:lint test:build",
     "test:build": "run-s build",
@@ -66,6 +66,7 @@
   ],
   "dependencies": {
     "@airjam/types": "^1.1.84",
+    "@babel/plugin-syntax-dynamic-import": "^7.8.3",
     "@popperjs/core": "^2.11.8",
     "@react-google-maps/api": "^2.19.2",
     "@stripe/react-stripe-js": "^2.7.1",

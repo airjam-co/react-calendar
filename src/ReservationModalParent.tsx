@@ -36,14 +36,14 @@ export const ReservationModalParent = ({
   onClose,
   submitPressed,
 }: Props) => {
-  const stripePromise = paymentIntent.paymentProcessor === PaymentProcessor.Stripe ? loadStripe(paymentProcessorPublicKey ? paymentProcessorPublicKey : "") : undefined;
+  const stripePromise = (paymentIntent.total > 0) && paymentIntent.paymentProcessor === PaymentProcessor.Stripe ? loadStripe(paymentProcessorPublicKey ? paymentProcessorPublicKey : "") : undefined;
   const stripeOptions = {
     clientSecret: paymentIntent.paymentHandshake,
     locale: (locale ? locale : 'en-US') as StripeElementLocale,
   };
 
   const reservationModalParent = (): React.JSX.Element => {
-    if (paymentIntent.paymentProcessor === PaymentProcessor.Stripe && stripePromise) {
+    if ((paymentIntent.total > 0) && paymentIntent.paymentProcessor === PaymentProcessor.Stripe && stripePromise) {
       console.log(paymentIntent);
       console.log(paymentIntent.paymentHandshake);
       console.log(JSON.stringify(paymentIntent));

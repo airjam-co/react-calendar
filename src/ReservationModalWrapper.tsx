@@ -75,7 +75,7 @@ export const ReservationModalWrapper = ({
 
   const renderModal = (): React.JSX.Element => {
     // TODO -- show something when payment detail fails to load
-    if (!request || !intent || !intent.total || !intent.paymentProcessor)
+    if (!request || !intent || !intent.paymentProcessor)
         return <span />;
     return <ReservationModalParent
         timezone={timezone}

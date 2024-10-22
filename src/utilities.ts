@@ -1,4 +1,4 @@
-import { CALENDAR_DEFAULT_TRANSLATIONS, ComponentTranslation, Translation, negotiateLocale } from "@airjam/types";
+import { CALENDAR_DEFAULT_TRANSLATIONS, ComponentTranslation, Translation, mergeTranslation, negotiateLocale } from "@airjam/types";
 const humanizeDuration = require("humanize-duration");
 
 export function getHumanReadableDuration(startTime: Date, endTime: Date): string {
@@ -27,16 +27,29 @@ export function getHumanReadableTimeNumber(timeNumber: number): string {
 }
 
 export function getPreferredTranslation(translations?: ComponentTranslation, locale?: string): Translation {
-    const preferredLocale = translations && locale ? negotiateLocale(translations, locale) : undefined;
-    const defaultTranslations = CALENDAR_DEFAULT_TRANSLATIONS;
-    let chosenTranslation = translations && translations.clientTranslations && preferredLocale ? translations.clientTranslations[preferredLocale] : undefined;
-     if (!chosenTranslation) {
-      console.log('no translation found, using default');
-      chosenTranslation = defaultTranslations.clientTranslations[defaultTranslations.defaultLocale];
-      if (preferredLocale) chosenTranslation = defaultTranslations.clientTranslations[preferredLocale];
+    const systemDefaultLocale = "en-US";
+    const preferredLocale = translations && locale ? negotiateLocale(translations, locale) : systemDefaultLocale;
+    const defaultTranslations = JSON.parse(JSON.stringify(CALENDAR_DEFAULT_TRANSLATIONS)) as ComponentTranslation;
+    let defaultTranslation = {} as Translation;
+    if (defaultTranslations.clientTranslations[preferredLocale]) {
+        defaultTranslation = JSON.parse(JSON.stringify(defaultTranslations.clientTranslations[preferredLocale])) as Translation;
+    } else if (locale && defaultTranslations.clientTranslations[locale]) {
+        defaultTranslation = JSON.parse(JSON.stringify(defaultTranslations.clientTranslations[locale])) as Translation;
+    } else if (defaultTranslations.clientTranslations[defaultTranslations.defaultLocale]) {
+        defaultTranslation = JSON.parse(JSON.stringify(defaultTranslations.clientTranslations[defaultTranslations.defaultLocale])) as Translation;
     }
-    let translationToUse: Translation = chosenTranslation!;
-    return translationToUse;
+
+    let overridingTranslation = {} as Translation;
+    if (translations && translations.clientTranslations) {
+        if (translations.clientTranslations[preferredLocale]) {
+            overridingTranslation = JSON.parse(JSON.stringify(translations.clientTranslations[preferredLocale])) as Translation;
+        } else if (locale && translations.clientTranslations[locale]) {
+            overridingTranslation = JSON.parse(JSON.stringify(translations.clientTranslations[locale])) as Translation;
+        } else if (translations.clientTranslations[systemDefaultLocale]) {
+            overridingTranslation = JSON.parse(JSON.stringify(translations.clientTranslations[systemDefaultLocale])) as Translation;
+        }
+    }
+    return overridingTranslation ? mergeTranslation(defaultTranslation, overridingTranslation) : defaultTranslation;
 }
 
 export const minToHumanizedDuration = (min: number, locale?: string) => {

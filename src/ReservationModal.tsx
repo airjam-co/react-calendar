@@ -35,8 +35,8 @@ export const ReservationModal = ({
   onClose,
   submitPressed,
 }: Props) => {
-  const stripeInstance = paymentIntent.paymentProcessor === PaymentProcessor.Stripe ? useStripe() : null;
-  const stripeElements = paymentIntent.paymentProcessor === PaymentProcessor.Stripe ? useElements() : null;
+  const stripeInstance = (paymentIntent.paymentProcessor === PaymentProcessor.Stripe) && (paymentIntent.total > 0) ? useStripe() : null;
+  const stripeElements = (paymentIntent.paymentProcessor === PaymentProcessor.Stripe) && (paymentIntent.total > 0) ? useElements() : null;
 
   const [isMounted, setIsMounted] = React.useState<Boolean>(false)
   const [startTime, setStartTime] = React.useState<Date>(new Date());
@@ -96,6 +96,8 @@ export const ReservationModal = ({
 
     const request = bookingRequest; // TODO rename this.
     request.paymentIntentId = paymentIntent.paymentIntentId;
+    request.locale = locale ? locale : "";
+    request.timezone = timezone;
 
     for (let i = 0; i < form.elements.length; i++) {
       const elem = form.elements.item(i)
@@ -111,7 +113,7 @@ export const ReservationModal = ({
         request[field.id as CalendarBookingRequestKey] = field.value
       }
     }
-    if (paymentIntent.paymentProcessor === PaymentProcessor.Stripe && stripeInstance && stripeElements) {
+    if ((paymentIntent.total > 0) && paymentIntent.paymentProcessor === PaymentProcessor.Stripe && stripeInstance && stripeElements) {
       const preSubmit = await stripeElements.submit();
       if (preSubmit.error) {
         console.log(preSubmit.error);
@@ -130,17 +132,12 @@ export const ReservationModal = ({
         // Show error to your customer (for example, payment details incomplete)
         console.log(result.error.message);
         return;
-      } else {
+      }
+    }
     if (submitPressed) {
       // you need to pass booking reservation id, and payment intent
       submitPressed(resource, request);
     }
-        // Your customer will be redirected to your `return_url`. For some payment
-        // methods like iDEAL, your customer will be redirected to an intermediate
-        // site first to authorize the payment, then redirected to the `return_url`.
-      }
-    }
-
   };
 
   const reserveDialog = (): React.JSX.Element => {

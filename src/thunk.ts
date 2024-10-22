@@ -133,6 +133,39 @@ export const bookReservation = async (
   }
 };
 
+export const cancelReservation = async (
+  reservationId: string,
+  host?: string,
+  authToken?: string,
+  moderationKey?: string,
+) : Promise<BookingResponse> => {
+  // need to provide either the moderation key or auth token
+  let hostUrl = host || DEFAULT_HOST;
+  hostUrl += CALENDAR_BOOK_ENDPOINT;
+  const requestOptions = {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': authToken ? 'Bearer ' + authToken : '',
+    },
+    body: JSON.stringify({
+      id: reservationId,
+      key: moderationKey
+    }),
+  };
+  try {
+    const json = await fetch(hostUrl, requestOptions);
+    if (json) {
+      const resp = await json.json();
+      return resp as BookingResponse;
+    }
+    return { success: false } as BookingResponse;
+  } catch (error) {
+    console.log(error);
+    return { success: false } as BookingResponse;
+  }
+};
+
 export const moderateReservation = async (
   componentId: string,
   reservationId: string,
@@ -222,17 +255,28 @@ export const fetchMyReservations = async (
   componentId: string,
   host?: string,
   authToken?: string,
+  queryStartTime?: Date,
+  queryEndTime?: Date | undefined,
   page?: number,
   resultsPerPage?: number,
+  reservationStatus?: EventReservationStatus,
 ): Promise<FetchReservationsResult | undefined> => {
+  const queryStartDate = queryStartTime ? new Date(queryStartTime) : new Date();
   let hostUrl = host || DEFAULT_HOST;
-  hostUrl += CALENDAR_RESOURCE_MY_RESERVATIONS_ENDPOINT + "?id=" + componentId
+  hostUrl += CALENDAR_RESOURCE_MY_RESERVATIONS_ENDPOINT + "?id=" + componentId + "&startTimeUtc=" + queryStartDate.toISOString();
   if (page) {
     hostUrl += '&page=' + page
   }
   if (resultsPerPage) {
     hostUrl += '&resultsPerPage=' + resultsPerPage
   }
+  if (queryEndTime) {
+    const queryEndDate = new Date(queryEndTime);
+    hostUrl += '&endTimeUtc=' + queryEndDate!.toISOString();
+  } else {
+    hostUrl += '&endTimeUtc=' + addDays(queryStartDate, 1).toISOString();
+  }
+  if (reservationStatus) hostUrl += '&reservationStatus=' + reservationStatus;
   try {
     const json = await fetch(hostUrl, {
       headers: new Headers({

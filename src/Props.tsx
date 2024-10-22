@@ -1,4 +1,4 @@
-import { AirJamFilter, CalendarEvent, CalendarResource, EventReservation, EventReservationStatus, PaginationStyle, PrivateCalendarResource } from "@airjam/types"
+import { AirJamFilter, CalendarEvent, CalendarResource, CssTheme, EventReservation, EventReservationStatus, PaginationStyle, PrivateCalendarResource } from "@airjam/types"
 import { CalendarViewType as ViewType } from '@airjam/types';
 
 export interface Props {
@@ -21,9 +21,11 @@ export interface Props {
   minDistance?: number;
   customFilters?: AirJamFilter;
   reservationStatusFilter?: EventReservationStatus;
+  cssTheme?: CssTheme;
   renderEventFunc?: (event: CalendarEvent, index: number) => any;
   renderResourceFunc?: (resource: CalendarResource, index: number, toggleVisibility?: () => Promise<string>) => any;
-  renderEventReservationFunc?: (reservation: EventReservation, index: number, acceptButton: React.JSX.Element, rejectButton: React.JSX.Element) => any;
+  renderEventReservationFunc?: (reservation: EventReservation, index: number, acceptButton: React.JSX.Element, rejectButton: React.JSX.Element, cancelButton: React.JSX.Element) => any;
+  renderMyReservationFunc?: (reservation: EventReservation, index: number, cancelButton: React.JSX.Element) => any;
   onPagePressed?: (newPage: number) => void;
   onResourceSelected?: (resource: PrivateCalendarResource) => void;
 

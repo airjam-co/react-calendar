@@ -8,12 +8,12 @@ import 'react-toastify/dist/ReactToastify.css';
 import { Value } from 'react-calendar/dist/cjs/shared/types';
 
 import Dropdown from 'react-bootstrap/Dropdown';
-import { CalendarViewType as ViewType, CalendarEvent, CalendarBookingAvailability, addDays, GetEventsDuration, CalendarResource, Point, PrivateCalendarResource, CalendarResourceFieldProperty, EventReservation, EventReservationStatus, CALENDAR_RESOURCE_MY_RESOURCE_ENDPOINT, ComponentTranslation, Translation, getTranslation } from '@airjam/types';
+import { CalendarViewType as ViewType, CalendarEvent, CalendarBookingAvailability, addDays, GetEventsDuration, CalendarResource, Point, PrivateCalendarResource, CalendarResourceFieldProperty, EventReservation, EventReservationStatus, CALENDAR_RESOURCE_MY_RESOURCE_ENDPOINT, ComponentTranslation, Translation, getTranslation, CssTheme } from '@airjam/types';
 import { Props } from './Props';
 import { BookingResultPage } from './BookingResultPage';
 import { BookingRequestResource } from './BookingRequestResource';
 import { ToastContainer, toast } from 'react-toastify';
-import { FetchReservationRequestsResult, FetchReservationsResult, bookReservation, fetchCalendarView, fetchMyReservationRequests, fetchMyReservations, fetchMyResources, fetchReservationTerms, fetchResourceDetail, getTranslations, moderateReservation, searchResources } from './thunk';
+import { FetchReservationRequestsResult, FetchReservationsResult, bookReservation, fetchCalendarView, fetchMyReservationRequests, fetchMyReservations, fetchMyResources, fetchReservationTerms, fetchResourceDetail, getTranslations, cancelReservation, moderateReservation, searchResources } from './thunk';
 import { timezoneData } from './timezone_data';
 import { ReservationSuccessModal } from './ReservationSuccessModal';
 import { ReservationModalWrapper } from './ReservationModalWrapper';
@@ -28,15 +28,18 @@ import { getPreferredTranslation } from './utilities';
 export { CalendarViewType as ViewType } from '@airjam/types';
 
 const timezones: string[] = []
+const BootstrapTheme = React.lazy(() => import('./themes/BootstrapTheme'));
 
 export const Calendar = ({
   id,
   resourceId,
   authToken,
   host,
+  cssTheme,
   renderEventFunc,
   renderResourceFunc,
   renderEventReservationFunc,
+  renderMyReservationFunc,
   viewAs,
   showDate,
   showEndDate,
@@ -148,7 +151,7 @@ export const Calendar = ({
       } else if (viewAs === ViewType.MyResourcesList) {
         getMyResources(page, resultsPerPage)
       } else if (viewAs === ViewType.MyReservationsList) {
-        getMyReservations(page, resultsPerPage)
+        getMyReservations(startDate, showEndDate, page, resultsPerPage)
       } else if (viewAs === ViewType.MyReservationRequestsList) {
         getMyReservationRequests(startDate, showEndDate, page, resultsPerPage, resourceId)
       } else if (viewAs === ViewType.ResourceDetail) {
@@ -179,7 +182,7 @@ export const Calendar = ({
     } else if (viewAs === ViewType.ResourceDetail) {
       getMyResourceDetail()
     } else if (viewAs === ViewType.MyReservationsList) {
-      getMyReservations(selectedPage, resultsPerPage)
+      getMyReservations(showDate, showEndDate, selectedPage, resultsPerPage)
     } else if (viewAs === ViewType.MyReservationRequestsList) {
       getMyReservationRequests(showDate, showEndDate, selectedPage, resultsPerPage, resourceId)
     }
@@ -284,13 +287,16 @@ export const Calendar = ({
     })
   }
 
-  const getMyReservations = (page?: number, resultsLimit?: number) => {
+  const getMyReservations = (queryStartTime?: Date, queryEndTime?: Date | undefined, page?: number, resultsLimit?: number) => {
     fetchMyReservations(
       id,
       host,
       authToken,
+      queryStartTime,
+      queryEndTime,
       page ? page : 1,
       resultsLimit ? resultsLimit : DEFAULT_RESULTS_PER_PAGE,
+      reservationStatusFilter
     ).then((reservations) => {
       if (reservations) {
         setMyReservations(reservations)
@@ -533,16 +539,20 @@ export const Calendar = ({
     return (
       <div className='my-reservations-container'>
         {!myReservations || !myReservations.reservations || !myReservations.reservations.length ? (
-          <span className='no-reservation'>No reservation requests</span>
+          <span className='no-reservation'>No reservations</span>
         ) : (
-          myReservations!.reservations.map((myReservation, idx) => {
-          return <div className='my-reservation' key={myReservation._id + "-reservation-" + idx}>
-            {myReservation.title}
+          myReservations!.reservations.map((r, idx) => {
+          const cancelBtn = <Button className='reserve-slot-button' onClick={() => { cancelReservation(r.reservationId, host, authToken, r.reservationModerationKey)}}>Cancel</Button>;
+          if (renderMyReservationFunc) return renderMyReservationFunc(r, idx, cancelBtn);
+          return <div className='my-reservation' key={r._id + "-reservation-" + idx}>
+            <div>{r.title}</div>
+            <div>{r.notes}</div>
+            {cancelBtn}
           </div>
         }))}
       </div>
     )
-    }
+  }
 
   const renderMyReservationRequests = () => {
     // 1. group reservations by resource id
@@ -572,11 +582,12 @@ export const Calendar = ({
             {requests.map((r, idx) => {
               const acceptBtn = r.status === EventReservationStatus.Requested ? <Button className='reserve-slot-button' onClick={() => { moderateReservation(id, r.reservationId,  EventReservationStatus.Reserved, host, authToken)}}>Approve</Button> : <span></span>;
               const rejectBtn = r.status === EventReservationStatus.Requested ? <Button className='reserve-slot-button' onClick={() => { moderateReservation(id, r.reservationId, EventReservationStatus.Canceled, host, authToken)}}>Decline</Button> : <span></span>;
-              if (renderEventReservationFunc) return renderEventReservationFunc(r, idx, acceptBtn, rejectBtn);
+              const cancelBtn = <Button className='reserve-slot-button' onClick={() => { cancelReservation(r.reservationId, host, authToken, r.reservationModerationKey)}}>Cancel</Button>;
+              if (renderEventReservationFunc) return renderEventReservationFunc(r, idx, acceptBtn, rejectBtn, cancelBtn);
               return <div className='my-reservation-request' key={r.eventId + "-reservation-request-" + idx}>
                 <div>{r.title}</div>
                 <div>{r.notes}</div>
-                {acceptBtn} {rejectBtn}
+                {acceptBtn} {rejectBtn} {cancelBtn}
               </div>
             })}
           </div>;
@@ -707,8 +718,18 @@ export const Calendar = ({
     return renderList()
   }
 
+  if (cssTheme) {
+    console.log("Theme is there");
+    console.log(cssTheme);
+  }
+  console.log(cssTheme);
   return <div className='airjam-calendar-view'>
     {renderView()}
+    { cssTheme ? "Theme is there" : "no theme"}
+    { cssTheme && (cssTheme === CssTheme.Bootstrap) ? "Bootstrap" : "nothing"}
+    <React.Suspense fallback={<div />}>
+      {cssTheme && (cssTheme === CssTheme.Bootstrap) && <div className='cssTheme'><BootstrapTheme /></div>}
+    </React.Suspense>
     <ToastContainer />
     </div>
 }
