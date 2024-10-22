@@ -1,19 +1,19 @@
 {
   "name": "@airjam/react-calendar",
-  "version": "1.4.16",
+  "version": "1.4.17",
   "description": "React component for AirJam&#x27;s Calendar component",
   "author": "mjlee1983",
   "license": "MIT",
   "repository": "airjam-co/react-calendar",
-  "main": "dist/index.js",
-  "module": "dist/index.modern.js",
+  "main": "dist/react-calendar.js",
+  "module": "dist/react-calendar.modern.js",
   "source": "src/index.tsx",
   "engines": {
     "node": ">=10"
   },
   "scripts": {
-    "build": "microbundle --no-compress --format modern,cjs --jsx React.createElement --output ./dist",
-    "start": "microbundle watch --no-compress --format modern,cjs --jsx React.createElement --output ./dist",
+    "build": "microbundle --no-compress --format modern,cjs --jsx React.createElement --output ./dist -i ./dist/react-calendar.js",
+    "start": "microbundle watch --no-compress --format modern,cjs --jsx React.createElement --output ./dist -i ./dist/react-calendar.js",
     "prepare": "run-s build",
     "test": "run-s test:unit test:lint test:build",
     "test:build": "run-s build",
