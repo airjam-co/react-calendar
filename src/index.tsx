@@ -12,4 +12,3 @@ export * from './ReservationModalWrapper';
 export * from './ReservationSuccessModal';
 export * from './thunk';
 export * from './timezone_data';
-export * from './themes';

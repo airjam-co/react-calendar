@@ -4,7 +4,7 @@ import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
 import * as Icon from 'react-bootstrap-icons';
 import { msToHumanizedDuration } from './utilities';
-import { Translation, getTranslation } from '@airjam/types';
+import { EventReservationStatus, Translation, getTranslation } from '@airjam/types';
 
 interface Props {
   timezone: string;
@@ -33,7 +33,7 @@ export const ReservationSuccessModal = ({
     }} animation={false}>
       <Modal.Header>
         <Modal.Title>
-          {getTranslation(translation, "booking_success_modal_title")}
+          {bookingResult && bookingResult.response && bookingResult.response.status === EventReservationStatus.Requested ? getTranslation(translation, "booking_pending_modal_title") : getTranslation(translation, "booking_success_modal_title")}
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>

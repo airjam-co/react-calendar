@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@airjam/types@^1.1.84":
-  version "1.1.84"
-  resolved "https://registry.yarnpkg.com/@airjam/types/-/types-1.1.84.tgz#ad3fa94e36ca881b15ef4b879370274fdee0f2cb"
-  integrity sha512-/Fzq2pr7BFLZ/hdPRpfiDJtJ6EcRYe+IUkpTtyxgxrwQlx6Zd+02/U+Pbg4/kEPjPy+nEhrsYTdscNBd9FNXCg==
+"@airjam/types@^1.1.86":
+  version "1.1.86"
+  resolved "https://registry.yarnpkg.com/@airjam/types/-/types-1.1.86.tgz#de2ee44a64a6bac202c56aa5459c4d657b799267"
+  integrity sha512-BtDzj6RrNVd+9fMT45oZ3Pq2eOLxRNFhu3TAOE40Yr7RJlVSiTuXY7xlU8q1+68OAO3aK4mhzMT/J3UrAhgMrw==
   dependencies:
     "@types/googlemaps" "^3.43.3"
 

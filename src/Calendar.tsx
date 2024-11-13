@@ -40,6 +40,7 @@ export const Calendar = ({
   renderResourceFunc,
   renderEventReservationFunc,
   renderMyReservationFunc,
+  myReservationsHead,
   viewAs,
   showDate,
   showEndDate,
@@ -132,45 +133,7 @@ export const Calendar = ({
   useEffect(() => {
     if (!isMounted) {
       setIsMounted(true)
-
-      // Set timezone and load all timezones
-      const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
-      setTimezone(timeZone)
-      const newTimezoneData: string[] = []
-      timezoneData.forEach((tzDefinition: any) => tzDefinition.utc.forEach((tzName: string) => {
-        // remove any duplicates
-        if (newTimezoneData.indexOf(tzName) < 0) newTimezoneData.push(tzName)
-      }));
-      timezones.length = 0
-      timezones.push(...(newTimezoneData).sort())
-      loadTranslations()
-
-      if (showDate) setStartTime(new Date(showDate))
-      if (viewAs === ViewType.MapResourceList) {
-        searchForResources(latitude, longitude, selectedPage, resultsPerPage, minDistance, maxDistance, mapBoundNorthEast.current, mapBoundSouthWest.current)
-      } else if (viewAs === ViewType.MyResourcesList) {
-        getMyResources(page, resultsPerPage)
-      } else if (viewAs === ViewType.MyReservationsList) {
-        getMyReservations(startDate, showEndDate, page, resultsPerPage)
-      } else if (viewAs === ViewType.MyReservationRequestsList) {
-        getMyReservationRequests(startDate, showEndDate, page, resultsPerPage, resourceId)
-      } else if (viewAs === ViewType.ResourceDetail) {
-        getMyResourceDetail()
-      } else if (startDate) {
-        if (showEndDate && viewAs && viewAs === ViewType.List) {
-          fetchCalendarEvents(startDate, showEndDate)
-        } else if (viewAs === ViewType.CalendarBook) {
-          fetchReservationAvailability(startDate)
-        } else {
-          fetchCalendarEvents(startDate)
-        }
-      } else {
-        if (viewAs === ViewType.CalendarBook) {
-          fetchReservationAvailability(new Date(new Date().setHours(0, 0, 0, 0)))
-        } else {
-          fetchCalendarEvents(new Date(new Date().setHours(0, 0, 0, 0)))
-        }
-      }
+      initializeComponent();
     }
   }, [])
 
@@ -196,6 +159,53 @@ export const Calendar = ({
       fetchDay(startTime);
     }
   }, [bookingResult])
+
+  useEffect(() => {
+    console.log("New component id provided. reloading component with new id: " + id);
+    initializeComponent();
+  }, [id])
+
+  const initializeComponent = () => {
+    // Set timezone and load all timezones
+    const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
+    setTimezone(timeZone)
+    const newTimezoneData: string[] = []
+    timezoneData.forEach((tzDefinition: any) => tzDefinition.utc.forEach((tzName: string) => {
+      // remove any duplicates
+      if (newTimezoneData.indexOf(tzName) < 0) newTimezoneData.push(tzName)
+    }));
+    timezones.length = 0
+    timezones.push(...(newTimezoneData).sort())
+    loadTranslations()
+
+    if (showDate) setStartTime(new Date(showDate))
+    if (viewAs === ViewType.MapResourceList) {
+      searchForResources(latitude, longitude, selectedPage, resultsPerPage, minDistance, maxDistance, mapBoundNorthEast.current, mapBoundSouthWest.current)
+    } else if (viewAs === ViewType.MyResourcesList) {
+      getMyResources(page, resultsPerPage)
+    } else if (viewAs === ViewType.MyReservationsList) {
+      getMyReservations(startDate, showEndDate, page, resultsPerPage)
+    } else if (viewAs === ViewType.MyReservationRequestsList) {
+      getMyReservationRequests(startDate, showEndDate, page, resultsPerPage, resourceId)
+    } else if (viewAs === ViewType.ResourceDetail) {
+      getMyResourceDetail()
+    } else if (startDate) {
+      if (showEndDate && viewAs && viewAs === ViewType.List) {
+        fetchCalendarEvents(startDate, showEndDate)
+      } else if (viewAs === ViewType.CalendarBook) {
+        fetchReservationAvailability(startDate)
+      } else {
+        fetchCalendarEvents(startDate)
+      }
+    } else {
+      if (viewAs === ViewType.CalendarBook) {
+        fetchReservationAvailability(new Date(new Date().setHours(0, 0, 0, 0)))
+      } else {
+        fetchCalendarEvents(new Date(new Date().setHours(0, 0, 0, 0)))
+      }
+    }
+  }
+
 
   const fetchReservationAvailability = (
     queryStartTime: Date,
@@ -538,8 +548,9 @@ export const Calendar = ({
   const renderMyReservations = () => {
     return (
       <div className='my-reservations-container'>
+        { myReservationsHead ? myReservationsHead : ""}
         {!myReservations || !myReservations.reservations || !myReservations.reservations.length ? (
-          <span className='no-reservation'>No reservations</span>
+          <div className='no-reservation'>No reservations</div>
         ) : (
           myReservations!.reservations.map((r, idx) => {
           const cancelBtn = <Button className='reserve-slot-button' onClick={() => { cancelReservation(r.reservationId, host, authToken, r.reservationModerationKey)}}>Cancel</Button>;
@@ -570,16 +581,14 @@ export const Calendar = ({
     const requestedResources: string[] = Object.keys(requestsById);
     return (
       <div className='my-reservation-requests-container'>
+        { myReservationsHead ? myReservationsHead : ""}
         {!requestedResources.length ? (
-          <span className='no-reservation-request'>No reservation requests</span>
+          <div className='no-reservation-request'>No reservation requests</div>
         ) : (
           requestedResources.map((requestResourceId, idx) => {
           const requests = requestsById[requestResourceId];
           if (!requests || !requests.length) return <div className='my-reservation-requests-resource-group-container'></div>;
-          const resourceGroupName = requests[0].resourceName;
-          return <div className='my-reservation-requests-resource-group-container'>
-            <span className='resource-name'>{resourceGroupName}</span>
-            {requests.map((r, idx) => {
+          return requests && requests.length ? requests.map((r, idx) => {
               const acceptBtn = r.status === EventReservationStatus.Requested ? <Button className='reserve-slot-button' onClick={() => { moderateReservation(id, r.reservationId,  EventReservationStatus.Reserved, host, authToken)}}>Approve</Button> : <span></span>;
               const rejectBtn = r.status === EventReservationStatus.Requested ? <Button className='reserve-slot-button' onClick={() => { moderateReservation(id, r.reservationId, EventReservationStatus.Canceled, host, authToken)}}>Decline</Button> : <span></span>;
               const cancelBtn = <Button className='reserve-slot-button' onClick={() => { cancelReservation(r.reservationId, host, authToken, r.reservationModerationKey)}}>Cancel</Button>;
@@ -589,8 +598,7 @@ export const Calendar = ({
                 <div>{r.notes}</div>
                 {acceptBtn} {rejectBtn} {cancelBtn}
               </div>
-            })}
-          </div>;
+            }) : <span key={requestResourceId + "-reservation-request-" + idx}></span>;
         }))}
       </div>
     )
@@ -718,18 +726,13 @@ export const Calendar = ({
     return renderList()
   }
 
-  if (cssTheme) {
-    console.log("Theme is there");
-    console.log(cssTheme);
-  }
-  console.log(cssTheme);
   return <div className='airjam-calendar-view'>
     {renderView()}
-    { cssTheme ? "Theme is there" : "no theme"}
-    { cssTheme && (cssTheme === CssTheme.Bootstrap) ? "Bootstrap" : "nothing"}
-    <React.Suspense fallback={<div />}>
-      {cssTheme && (cssTheme === CssTheme.Bootstrap) && <div className='cssTheme'><BootstrapTheme /></div>}
-    </React.Suspense>
+    {cssTheme && (cssTheme === CssTheme.Bootstrap) && 
+      <React.Suspense fallback={<div />}>
+        <BootstrapTheme />
+      </React.Suspense>
+    }
     <ToastContainer />
     </div>
 }

@@ -78,15 +78,18 @@ export const ReservationModal = ({
     if (resource.staticPriceUnit === CalendarReservationPriceUnit.WholeEvent) {
       <div></div>
     }
-    const currency = curr ? curr : "USD";
-    return <div className='payment-pricing'>
-      <Icon.Ticket />&nbsp;
-      { Intl.NumberFormat(localeToUse.current, {
-        style: 'currency',
-        currency: currency,
-      }).format(resource.staticPrice)}
-      &nbsp; {getTranslation(translation, "freeform_base_price_pricing_unit_selector")} {minToHumanizedDuration(resource.bookingIncrementsInMin, locale)}
-    </div>;
+    if (resource.staticPrice && resource.staticPrice > 0 && resource.bookingIncrementsInMin > 0) {
+      const currency = curr ? curr : "USD";
+      return <div className='payment-pricing'>
+        <Icon.Ticket />&nbsp;
+        { Intl.NumberFormat(localeToUse.current, {
+          style: 'currency',
+          currency: currency,
+        }).format(resource.staticPrice)}
+        &nbsp; {getTranslation(translation, "freeform_base_price_pricing_unit_selector")} {minToHumanizedDuration(resource.bookingIncrementsInMin, locale)}
+      </div>;
+    }
+    return <div></div>; // do not show this if price unit is free.
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
