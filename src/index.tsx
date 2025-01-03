@@ -1,3 +1,4 @@
+export * from './ActionType';
 export * from './AvailabilitiesForADay';
 export * from './BookingRequestResource';
 export * from './BookingResponse';

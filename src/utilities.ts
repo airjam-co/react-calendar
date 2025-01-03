@@ -70,7 +70,19 @@ export const getArrayOfFallbackLanguages = (locale?: string) => {
     return returning;
 };
 
-export const msToHumanizedDuration = (valueInMs: number, locale?: string) => {
+export const msToHumanizedDuration = (valueInMs: number, locale?: string, units?: string[]) => {
     const localeToUse = locale ? locale : "en";
-    return humanizeDuration(valueInMs, { language: localeToUse, fallbacks: getArrayOfFallbackLanguages(localeToUse) });
+    const options: any =  { language: localeToUse, fallbacks: getArrayOfFallbackLanguages(localeToUse) };
+    if (units) options["units"] = units;
+    console.log(options);
+    return humanizeDuration(valueInMs, options);
+};
+
+export const convertTimezoneOfDay = (dateToUse: Date, from_timezone: string) => {
+  const dateToConvert = new Date(dateToUse);
+  const year = Number(dateToConvert.toLocaleDateString(undefined, {timeZone: from_timezone, year: "numeric"}));
+  const month = Number(dateToConvert.toLocaleDateString(undefined, {timeZone: from_timezone, month: "numeric"}));
+  const day = Number(dateToConvert.toLocaleDateString(undefined, {timeZone: from_timezone, day: "numeric"}));
+  const toZonedTime = new Date(year, month - 1, day);
+  return toZonedTime;
 };

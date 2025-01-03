@@ -13,18 +13,14 @@ export const fetchReservationTerms = async (
   let hostUrl = host || DEFAULT_HOST;
   const fetchStartTime =
     getDuration === GetEventsDuration.WholeMonth
-      ? new Date(queryStartTime.getFullYear(), queryStartTime.getMonth(), 1)
+      ? addDays(new Date(queryStartTime), -31)
       : new Date(queryStartTime);
   let fetchEndTime: Date = queryEndTime
     ? new Date(queryEndTime)
     : addDays(fetchStartTime, 1);
   if (getDuration === GetEventsDuration.WholeMonth) {
-    // move to the last day of the given month
-    fetchEndTime = new Date(
-      fetchEndTime.getFullYear(),
-      fetchEndTime.getMonth() + 1,
-      0
-    );
+    // add 31 days to the fetch start time
+    fetchEndTime = addDays(queryStartTime, 31);
   }
 
   hostUrl +=
@@ -40,6 +36,7 @@ export const fetchReservationTerms = async (
     const json = await fetch(hostUrl, {
       headers: new Headers({
         Authorization: authToken ? 'Bearer ' + authToken : '',
+        'Access-Control-Allow-Origin': '*',
       }),
     });
     if (json) {
@@ -87,6 +84,7 @@ export const getReservationPaymentDetail = async (
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
       'Authorization': authToken ? 'Bearer ' + authToken : '',
     },
     body: JSON.stringify(request),
@@ -117,6 +115,7 @@ export const bookReservation = async (
     headers: {
       'Content-Type': 'application/json',
       'Authorization': authToken ? 'Bearer ' + authToken : '',
+      'Access-Control-Allow-Origin': '*',
     },
     body: JSON.stringify(request),
   };
@@ -147,6 +146,7 @@ export const cancelReservation = async (
     headers: {
       'Content-Type': 'application/json',
       'Authorization': authToken ? 'Bearer ' + authToken : '',
+      'Access-Control-Allow-Origin': '*',
     },
     body: JSON.stringify({
       id: reservationId,
@@ -180,6 +180,7 @@ export const moderateReservation = async (
     headers: {
       'Content-Type': 'application/json',
       'Authorization': authToken ? 'Bearer ' + authToken : '',
+      'Access-Control-Allow-Origin': '*',
     },
     body: JSON.stringify({
       id: reservationId,
@@ -281,6 +282,7 @@ export const fetchMyReservations = async (
     const json = await fetch(hostUrl, {
       headers: new Headers({
         Authorization: authToken ? 'Bearer ' + authToken : '',
+        'Access-Control-Allow-Origin': '*',
       }),
     });
     if (json) {
@@ -334,6 +336,7 @@ export const fetchMyReservationRequests = async (
     const json = await fetch(hostUrl, {
       headers: new Headers({
         Authorization: authToken ? 'Bearer ' + authToken : '',
+        'Access-Control-Allow-Origin': '*',
       }),
     });
     if (json) {
@@ -374,6 +377,7 @@ export const fetchMyResources = async (
     const json = await fetch(hostUrl, {
       headers: new Headers({
         Authorization: authToken ? 'Bearer ' + authToken : '',
+        'Access-Control-Allow-Origin': '*',
       }),
     });
     if (json) {
@@ -414,6 +418,7 @@ export const fetchResourceDetail = async (
     const json = await fetch(hostUrl, {
       headers: new Headers({
         Authorization: authToken ? 'Bearer ' + authToken : '',
+        'Access-Control-Allow-Origin': '*',
       }),
     });
     if (json) {
@@ -457,6 +462,7 @@ export const fetchCalendarView = async (
     const json = await fetch(hostUrl, {
       headers: new Headers({
         Authorization: authToken ? 'Bearer ' + authToken : '',
+        'Access-Control-Allow-Origin': '*',
       }),
     });
     if (json) {
@@ -490,7 +496,11 @@ export const getTranslations = async (id: string, host?: string, locale?: string
     hostUrl += CALENDAR_TRANSLATIONS_ENDPOINT + "?id=" + id;
     if (locale) hostUrl += "&locale=" + locale;
     try {
-      const json = await fetch(hostUrl);
+      const json = await fetch(hostUrl, {
+        headers: new Headers({
+          'Access-Control-Allow-Origin': '*',
+        }),
+      });
       if (json && json) {
         const response = await json.json();
         if (response && response.translations) return response.translations as ComponentTranslation;

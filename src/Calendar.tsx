@@ -8,7 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { Value } from 'react-calendar/dist/cjs/shared/types';
 
 import Dropdown from 'react-bootstrap/Dropdown';
-import { CalendarViewType as ViewType, CalendarEvent, CalendarBookingAvailability, addDays, GetEventsDuration, CalendarResource, Point, PrivateCalendarResource, CalendarResourceFieldProperty, EventReservation, EventReservationStatus, CALENDAR_RESOURCE_MY_RESOURCE_ENDPOINT, ComponentTranslation, Translation, getTranslation, CssTheme } from '@airjam/types';
+import { CalendarViewType as ViewType, CalendarEvent, CalendarBookingAvailability, addDays, GetEventsDuration, CalendarResource, Point, PrivateCalendarResource, CalendarResourceFieldProperty, EventReservation, EventReservationStatus, CALENDAR_RESOURCE_MY_RESOURCE_ENDPOINT, ComponentTranslation, Translation, getTranslation, CssTheme, CalendarBookingUnit, BookingResource, CalendarEventReservableUntilType, TimeUnit } from '@airjam/types';
 import { Props } from './Props';
 import { BookingResultPage } from './BookingResultPage';
 import { BookingRequestResource } from './BookingRequestResource';
@@ -23,7 +23,8 @@ import { DayCalendarGroupedByLocation } from './DayCalendarGroupedByLocation';
 import { EventListGroupedByDay } from './EventListGroupedByDay';
 import { MapResourceList } from './MapResourceList';
 import { Button } from 'react-bootstrap';
-import { getPreferredTranslation } from './utilities';
+import { convertTimezoneOfDay, getPreferredTranslation } from './utilities';
+import { ActionType } from './ActionType';
 
 export { CalendarViewType as ViewType } from '@airjam/types';
 
@@ -36,6 +37,7 @@ export const Calendar = ({
   authToken,
   host,
   cssTheme,
+  onAction,
   renderEventFunc,
   renderResourceFunc,
   renderEventReservationFunc,
@@ -59,6 +61,9 @@ export const Calendar = ({
   reservationStatusFilter,
   descriptionLength,
   onResourceSelected,
+  onCalendarMonthChanged,
+  onBookingStartTimeChanged,
+  onBookingEndTimeChanged,
   googleMapsApiKey,
   bookingDefaultEmail,
   bookingDefaultName,
@@ -70,6 +75,7 @@ export const Calendar = ({
   mapMarkerLabelFunc,
   paymentProcessorPublicKey,
   renderMapMarkerInfoWindowFunc,
+  renderBookingResourcesSelectionFunc
 }: Props) => {
   const [startTime, setStartTime] = useState<Date>(
     new Date(new Date().setHours(0, 0, 0, 0))
@@ -85,10 +91,14 @@ export const Calendar = ({
   const [myReservations, setMyReservations] = React.useState<FetchReservationsResult | undefined>(undefined)
   const [myReservationRequests, setMyReservationRequests] = React.useState<FetchReservationRequestsResult | undefined>(undefined)
   const [resource, setResource] = React.useState<PrivateCalendarResource | undefined>(undefined)
+  const [resourceIdSelected, setResourceIdSelected] = React.useState<string>("")
   const [resourceProperty, setResourceProperty] = React.useState<{[fieldName: string]: CalendarResourceFieldProperty}>({})
   const [selectedPage, setSelectedPage] = React.useState<number | undefined>(page);
   const [componentTranslations, setComponentTranslations] = React.useState<ComponentTranslation | undefined>(undefined)
   const [preferredTranslation, setPreferredTranslation] = React.useState<Translation>({} as Translation)
+  const [dailyBookStart, setDailyBookStart] = React.useState<Date | undefined>()
+  const [dailyBookEnd, setDailyBookEnd] = React.useState<Date | undefined>()
+  const [, forceUpdate] = useState({});
   const mapBoundNorthEast = React.useRef<Point | undefined>(undefined);
   const mapBoundSouthWest = React.useRef<Point | undefined>(undefined);
 
@@ -98,6 +108,7 @@ export const Calendar = ({
     if (newDate) {
       const newStartTime: Date = new Date(newDate.toString())
       setStartTime(newStartTime)
+      if (onBookingStartTimeChanged) onBookingStartTimeChanged(newStartTime);
       if (isMounted) {
         if (viewAs === ViewType.CalendarBook) {
           fetchReservationAvailability(newStartTime)
@@ -106,6 +117,29 @@ export const Calendar = ({
         }
       }
     }
+  }
+
+  type ValuePiece = Date | null;
+  const onRangeChange = (selectedDates: [ValuePiece, ValuePiece]) => {
+    if (selectedDates.length < 2) {
+      // something bad happened, ignore
+      console.log("Range selector is chosen for single date select");
+      console.log(selectedDates);
+      return;
+    }
+    if (!selectedDates[1]) {
+      console.log("End date is not selected. Unsetting range");
+      setDailyBookStart(undefined);
+      setDailyBookEnd(undefined);
+      return;
+    }
+    const newRangeStart = new Date(selectedDates[0] ? selectedDates[0] : "");
+    const newRangeEnd = new Date(selectedDates[1] ? selectedDates[1] : "");
+    console.log("Newly selected range: " + newRangeStart + " - " + newRangeEnd)
+    setDailyBookStart(newRangeStart)
+    setDailyBookEnd(newRangeEnd)
+    if (onBookingStartTimeChanged) onBookingStartTimeChanged(newRangeStart);
+    if (onBookingEndTimeChanged) onBookingEndTimeChanged(newRangeEnd);
   }
 
   const fetchDay = (newDate: Date) => {
@@ -374,6 +408,7 @@ export const Calendar = ({
         <span className='calendar-block'>
           <ReactCalendar
             onChange={onChange}
+            locale={locale}
             defaultActiveStartDate={startDate || new Date()}
             defaultValue={startDate}
           />
@@ -392,12 +427,187 @@ export const Calendar = ({
 
   const renderCalendarBook = () => {
     // TODO figure out a way to place dots on top of dates that have availability
+    // When one or more resources are selectable in daily fashion, all are considered daily and the interface will show the daily one
+    const dailyMode = availability && availability.resources && availability.resources.length ?
+      availability.resources.find(r => r.bookingUnit === CalendarBookingUnit.Daily) : false;
 
+    // if daily mode, then show resource selector if there's more than one resource
+    if (dailyMode) {
+      const resourceCount = availability && availability.resources ? availability.resources.length : 0;
+      if ((resourceCount > 1) && !resourceIdSelected)
+        return renderCalendarDailySelectResource()
+      return renderCalendarDailyBook()
+    }
+    return renderCalendarBookByTimeSlot()
+  }
+
+  const setResourceIdFunc = (newResourceId: string) => {
+    if (!availability) {
+      console.log("ERROR: Calendar is not loaded. Please make sure you are invoking this function after the calendar is loaded in daily booking mode.")
+      return
+    }
+    const chosenResource = availability.resources.find(r => r._id === newResourceId);
+    if (!chosenResource) {
+      console.log("ERROR: Resource id " + newResourceId + " not found. Please make sure you are returning a valid resource id.")
+      return
+    }
+    setResourceIdSelected(newResourceId)
+  }
+
+  const renderCalendarDailySelectResource = () => {
+    const resources = availability && availability.resources ? availability.resources : [];
+    if (renderBookingResourcesSelectionFunc) {
+      return renderBookingResourcesSelectionFunc(resources, setResourceIdFunc)
+    }
+    return (
+        <div className='calendar-view-container'>
+          {getTranslation(preferredTranslation, "select_a_resource_to_book")}
+          {resources.map(r => {
+            return <div key={r._id + "-resource"}>
+            <Button className='select-resource-button' onClick={() => {setResourceIdFunc(r._id)}}>{r.name}</Button>
+            </div>;
+          })}
+        </div>
+      )
+  }
+
+  const renderCalendarDailyBook = () => {
+    let chosenResource: BookingResource | undefined = undefined;
+    if (availability && availability.resources && availability.resources.length > 0) {
+      chosenResource = availability.resources.find(r => r._id === resourceIdSelected);
+      if (!chosenResource) {
+        console.log("ERROR: Resource id " + resourceIdSelected + " not found. Using default resource.")
+      }
+      if (!chosenResource) chosenResource = availability.resources[0];
+    }
+    if (!chosenResource) {
+      return <div>Please wait until availabilities are loaded. You do not have a resource chosen and availabilities loaded</div>;
+    }
+    let maxDate: Date | undefined = undefined;
+    if (chosenResource.reservableUntilType === CalendarEventReservableUntilType.FixedTime && chosenResource.availabilityEndTime) {
+      maxDate = new Date(chosenResource.availabilityEndTime);
+    } else if (chosenResource.reservableUntilType === CalendarEventReservableUntilType.Duration && Number(chosenResource.reservableUntil) > 0) {
+      const increment = Number(chosenResource.reservableUntil);
+      maxDate = new Date();
+      switch (chosenResource.reservableUntilUnit) {
+        case TimeUnit.YEARLY:
+          maxDate.setFullYear(maxDate.getFullYear() + increment);
+          break;
+        case TimeUnit.MONTHLY:
+          maxDate.setMonth(maxDate.getMonth() + increment);
+          break;
+        case TimeUnit.WEEKLY:
+          maxDate.setDate(maxDate.getDate() + increment * 7);
+          break;
+        case TimeUnit.DAILY:
+          maxDate.setDate(maxDate.getDate() + increment);
+          break;
+        case TimeUnit.HOURLY:
+          maxDate.setHours(maxDate.getHours() + increment);
+          break;
+        case TimeUnit.MINUTELY:
+          maxDate.setMinutes(maxDate.getMinutes() + increment);
+          break;
+        case TimeUnit.SECONDLY:
+          maxDate.setSeconds(maxDate.getSeconds() + increment);
+          break;
+      }
+    }
+    const canSelectPast = chosenResource.processPastEvents;
+    let minDate: Date | undefined = canSelectPast ? undefined :new Date();
+    if (chosenResource.availabilityStartTime) {
+      const specifiedStartTime = new Date(chosenResource.availabilityStartTime);
+      minDate = minDate ? (specifiedStartTime.getTime() > minDate.getTime() ? specifiedStartTime : minDate) : specifiedStartTime;
+    }
+    return (
+        <div className='calendar-view-container'>
+          {chosenResource ? chosenResource.name : ""}
+          <span className='calendar-block'>
+            <ReactCalendar
+              onChange={onRangeChange}
+              locale={locale}
+              selectRange={true}
+              minDate={minDate}
+              maxDate={maxDate}
+              allowPartialRange={true}
+              defaultActiveStartDate={startDate || new Date()}
+              onActiveStartDateChange={({ action, activeStartDate, value, view }) => {
+                if (activeStartDate) {
+                  const activeDate = new Date(activeStartDate);
+                  fetchReservationAvailability(activeStartDate, addDays(activeStartDate, 31));
+                  if (onCalendarMonthChanged) onCalendarMonthChanged(activeDate);
+                }
+              }}
+              tileDisabled={({ activeStartDate, date, view }) => {
+                if (minDate && date.getTime() < minDate.getTime()) return true;
+                if (maxDate && date.getTime() > maxDate.getTime()) return true;
+                if (chosenResource) {
+                  const beginOfDay = convertTimezoneOfDay(date, chosenResource.timezone);
+                  if (chosenResource.unavailableTimes && chosenResource.unavailableTimes.length > 0) {
+                    const unavailableIdx = chosenResource.unavailableTimes.findIndex(ut => {
+                      const utDateStartTime = convertTimezoneOfDay(ut.startTimeUtc, chosenResource!.timezone);
+                      const utDateEndTime = convertTimezoneOfDay(ut.endTimeUtc, chosenResource!.timezone);
+                      return (utDateStartTime.getTime() <= beginOfDay.getTime()) && (utDateEndTime.getTime() >= beginOfDay.getTime());
+                    });
+                    if (unavailableIdx >= 0) return true;
+                  }
+                  if (chosenResource.availableTimes && chosenResource.availableTimes.length > 0) {
+                    const availableIdx = chosenResource.availableTimes.findIndex(at => {
+                      const atDateStartTime = convertTimezoneOfDay(at.startTimeUtc, chosenResource!.timezone);
+                      const atDateEndTime = convertTimezoneOfDay(at.endTimeUtc, chosenResource!.timezone);
+                      return (atDateStartTime.getTime() <= beginOfDay.getTime()) && (atDateEndTime.getTime() >= beginOfDay.getTime());
+                    });
+                    if (availableIdx > 0) return false;
+                  }
+                }
+                // unspecified time ranges are assumed to be available
+                return false;
+              }}
+              defaultValue={startDate}
+            />
+          </span>
+          <span className='daily-book-time-container'>
+            {resourceIdSelected ?
+              <div className='daily-book-time-container-back-button'>
+                <Button className='reset-resource-selection' disabled={!resourceIdSelected} onClick={() => {
+                  setResourceIdSelected("");
+                }}>Back</Button>
+              </div>
+            : ''}
+            <div className='daily-book-time-container-book-button'>
+              <Button className='reserve-slot-button' disabled={!dailyBookStart || !dailyBookEnd} onClick={() => {
+                const newBooking = {
+                  resource: chosenResource,
+                  startTimeUtc: dailyBookStart,
+                  endTimeUtc: dailyBookEnd,
+                } as BookingRequestResource
+                setBookingDialog(newBooking);
+              }}>Book</Button>
+            </div>
+          </span>
+        {bookingResult ? 
+          <ReservationSuccessModal
+            key={'reservation-success'}
+            timezone={timezone.toString()}
+            bookingResult={bookingResult}
+            locale={locale}
+            translation={preferredTranslation}
+            onClose={() => {
+              setBookingResult(undefined)
+            }}
+          /> : <span className="empty-modal"></span>}
+        {bookingDialog ? reserveDialog(bookingDialog) : <span className="empty-modal"></span>}
+        </div>
+      )
+  }
+
+  const renderCalendarBookByTimeSlot = () => {
     return (
       <div className='calendar-view-container'>
         <span className='calendar-block'>
           <ReactCalendar
             onChange={onChange}
+            locale={locale}
             defaultActiveStartDate={startDate || new Date()}
             defaultValue={startDate}
           />
@@ -482,7 +692,7 @@ export const Calendar = ({
       <Dropdown.Toggle variant="link" id="dropdown-basic">
         {selectSelectedTimezone ? timezone.toString(): ''}
       </Dropdown.Toggle>
-      <Dropdown.Menu>
+      <Dropdown.Menu className='dropdown-height-cap' style={{height: "400px", overflowY: "auto"}}>
         {
           timezones.map((zone: string) => {
             return <Dropdown.Item key={zone} href={'#' + zone}>{zone.replaceAll('_', ' ')}</Dropdown.Item>
@@ -553,7 +763,23 @@ export const Calendar = ({
           <div className='no-reservation'>No reservations</div>
         ) : (
           myReservations!.reservations.map((r, idx) => {
-          const cancelBtn = <Button className='reserve-slot-button' onClick={() => { cancelReservation(r.reservationId, host, authToken, r.reservationModerationKey)}}>Cancel</Button>;
+          const cancelBtn = <Button className='reserve-slot-button' onClick={async () => {
+            const resp = await cancelReservation(r.reservationId, host, authToken, r.reservationModerationKey);
+            if (onAction) onAction(resp.success ? ActionType.ReservationCancelled : ActionType.ReservationNotCancelled, resp);
+            if (resp.success) {
+              let reservations = myReservations.reservations.map((rez) => {
+                if (rez._id === r._id) {
+                  const rez2 = rez;
+                  rez2.status = EventReservationStatus.Canceled;
+                  return rez2;
+                } else return rez;
+              });
+              const newMyReservations = myReservations;
+              newMyReservations.reservations = reservations;
+              setMyReservations(newMyReservations);
+              forceUpdate({});
+            }
+          }}>Cancel</Button>;
           if (renderMyReservationFunc) return renderMyReservationFunc(r, idx, cancelBtn);
           return <div className='my-reservation' key={r._id + "-reservation-" + idx}>
             <div>{r.title}</div>
@@ -589,14 +815,72 @@ export const Calendar = ({
           const requests = requestsById[requestResourceId];
           if (!requests || !requests.length) return <div className='my-reservation-requests-resource-group-container'></div>;
           return requests && requests.length ? requests.map((r, idx) => {
-              const acceptBtn = r.status === EventReservationStatus.Requested ? <Button className='reserve-slot-button' onClick={() => { moderateReservation(id, r.reservationId,  EventReservationStatus.Reserved, host, authToken)}}>Approve</Button> : <span></span>;
-              const rejectBtn = r.status === EventReservationStatus.Requested ? <Button className='reserve-slot-button' onClick={() => { moderateReservation(id, r.reservationId, EventReservationStatus.Canceled, host, authToken)}}>Decline</Button> : <span></span>;
-              const cancelBtn = <Button className='reserve-slot-button' onClick={() => { cancelReservation(r.reservationId, host, authToken, r.reservationModerationKey)}}>Cancel</Button>;
+              const acceptBtn = <Button className={r.status === EventReservationStatus.Requested ? 'reserve-slot-button' : 'reserve-slot-button hideImportant'} onClick={ async () => {
+                const resp = await moderateReservation(id, r.reservationId,  EventReservationStatus.Reserved, host, authToken);
+                if (onAction) onAction(resp ? ActionType.ReservationAccepted : ActionType.ReservationRejectionFailed);
+                if (resp) {
+                  if (myReservationRequests && myReservationRequests.reservations) {
+                    let reservations = myReservationRequests.reservations.map((rez) => {
+                      if (rez._id === r._id) {
+                        const rez2 = rez;
+                        rez2.status = EventReservationStatus.Reserved;
+                        return rez2;
+                      } else return rez;
+                    });
+                    const myReservationRequests2 = myReservationRequests;
+                    myReservationRequests2.reservations = reservations;
+                    setMyReservationRequests(myReservationRequests2);
+                    forceUpdate({});
+                  }
+                }
+              }}>Approve</Button>;
+              const rejectBtn = <Button className={r.status === EventReservationStatus.Requested ? 'reserve-slot-button' : 'reserve-slot-button hideImportant'} onClick={ async () => {
+                const resp = await moderateReservation(id, r.reservationId, EventReservationStatus.Canceled, host, authToken);
+                if (onAction) onAction(resp ? ActionType.ReservationRejected : ActionType.ReservationRejectionFailed);
+                if (resp) {
+                  if (myReservationRequests && myReservationRequests.reservations) {
+                    let reservations = myReservationRequests.reservations.map((rez) => {
+                      if (rez._id === r._id) {
+                        const rez2 = rez;
+                        rez2.status = EventReservationStatus.Canceled;
+                        return rez2;
+                      } else return rez;
+                    });
+                    const myReservationRequests2 = myReservationRequests;
+                    myReservationRequests2.reservations = reservations;
+                    setMyReservationRequests(myReservationRequests2);
+                    forceUpdate({});
+                  }
+                } else {
+                  console.log("resp is empty");
+                }
+              }}>Decline</Button>;
+              const cancelBtn = <Button className='reserve-slot-button' onClick={ async () => {
+                const resp = await cancelReservation(r.reservationId, host, authToken, r.reservationModerationKey);
+                if (onAction) onAction(resp.success ? ActionType.ReservationCancelled : ActionType.ReservationNotCancelled, resp);
+                if (resp.success) {
+                  if (myReservationRequests && myReservationRequests.reservations) {
+                    let reservations = myReservationRequests.reservations.map((rez) => {
+                      if (rez._id === r._id) {
+                        const rez2 = rez;
+                        rez2.status = EventReservationStatus.Canceled;
+                        return rez2;
+                      } else return rez;
+                    });
+                    const myReservationRequests2 = myReservationRequests;
+                    myReservationRequests2.reservations = reservations;
+                    setMyReservationRequests(myReservationRequests2);
+                    forceUpdate({});
+                  }
+                }
+              }}>Cancel</Button>;
               if (renderEventReservationFunc) return renderEventReservationFunc(r, idx, acceptBtn, rejectBtn, cancelBtn);
               return <div className='my-reservation-request' key={r.eventId + "-reservation-request-" + idx}>
                 <div>{r.title}</div>
                 <div>{r.notes}</div>
-                {acceptBtn} {rejectBtn} {cancelBtn}
+                {acceptBtn}
+                {rejectBtn}
+                {cancelBtn}
               </div>
             }) : <span key={requestResourceId + "-reservation-request-" + idx}></span>;
         }))}
@@ -625,7 +909,6 @@ export const Calendar = ({
 
   // returns the new visibility status, empty if not updated
   const toggleVisibility = async (resource: PrivateCalendarResource): Promise<string> => {
-    console.log("toggle visibility has been triggered: " + resource.status);
     const detailResponse = await fetchResourceDetail(id, resource._id, host, authToken);
     if (!detailResponse || !detailResponse.resource) return "";
     const updatingResource = detailResponse.resource;

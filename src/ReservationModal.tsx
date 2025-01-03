@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import type { BookingRequestResource } from './BookingRequestResource';
 import { Button, Col, Form, InputGroup, Modal, Row } from 'react-bootstrap';
 import * as Icon from 'react-bootstrap-icons';
-import { BookingResource, CalendarBookingRequest, CalendarReservationPriceUnit, EventReservationPaymentIntentDetail, PaymentProcessor, Translation, getTranslation } from '@airjam/types';
+import { BookingResource, CalendarBookingRequest, CalendarBookingUnit, CalendarReservationPriceUnit, EventReservationPaymentIntentDetail, PaymentProcessor, Translation, getTranslation } from '@airjam/types';
 import { minToHumanizedDuration, msToHumanizedDuration } from './utilities';
 import { useElements, useStripe } from '@stripe/react-stripe-js';
 interface Props {
@@ -163,23 +163,36 @@ export const ReservationModal = ({
         <Row className='dialog-upper-content'>
             <Col sm={12}>
               <div className='booking-timeframe'>
-                <Icon.CalendarEvent />
-                &nbsp;{startTime.toLocaleString(localeToUse.current, {
-                  timeZone:timezone.toString(), weekday:"short", year:"numeric", month:"short", day:"numeric", hour: 'numeric', minute: 'numeric', hour12: true
-                }) } {getTranslation(translation, "freeform_operating_hours_hour_duration_phrase")} {endTime.toLocaleString(localeToUse.current, {
-                  timeZone:timezone.toString(), weekday:"short", month:"short", day:"numeric", hour: 'numeric', minute: 'numeric', hour12: true
-                })}
+                <Icon.CalendarEvent />&nbsp;
+                {
+                  resource.resource.bookingUnit === CalendarBookingUnit.Daily ?
+                  <span>
+                    {startTime.toLocaleDateString(localeToUse.current, {timeZone:timezone.toString()}) } {getTranslation(translation, "freeform_operating_hours_hour_duration_phrase")} {endTime.toLocaleDateString(localeToUse.current, {timeZone:timezone.toString()})}
+                  </span> :
+                  <span>
+                    {startTime.toLocaleString(localeToUse.current, {
+                      timeZone:timezone.toString(), weekday:"short", year:"numeric", month:"short", day:"numeric", hour: 'numeric', minute: 'numeric', hour12: true
+                    }) } {getTranslation(translation, "freeform_operating_hours_hour_duration_phrase")} {endTime.toLocaleString(localeToUse.current, {
+                      timeZone:timezone.toString(), weekday:"short", month:"short", day:"numeric", hour: 'numeric', minute: 'numeric', hour12: true
+                    })}
+                  </span>
+                }
               </div>
               <div className='payment-detail'>
                 <Icon.Clock />
-                &nbsp;{msToHumanizedDuration(endTime.getTime() - startTime.getTime(), locale)}
+                &nbsp;{
+                  resource.resource.bookingUnit === CalendarBookingUnit.Daily ?
+                  msToHumanizedDuration(new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDay()).getTime() - new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDay()).getTime(), locale, ["y", "mo", "d"])
+                  :
+                  msToHumanizedDuration(endTime.getTime() - startTime.getTime(), locale)
+                }
               </div>
-              <div className='booking-timezone'>
+              {resource.resource.bookingUnit === CalendarBookingUnit.Daily ? "" : <div className='booking-timezone'>
                 <Icon.GlobeAmericas />
                 &nbsp;{timezone}
-              </div>
+              </div>}
 
-              {showDynamicPricing(resource.resource, paymentIntent.currency)}
+              {showDynamicPricing(resource.resource, paymentIntent.currency ? paymentIntent.currency : "USD")}
 
               <div className='payment-total'>
                 {getTranslation(translation, "cost_total")}:&nbsp;
