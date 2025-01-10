@@ -1,14 +1,14 @@
 {
-  "name": "@airjam/react-calendar-ci",
-  "version": "1.8.1",
+  "name": "@airjam/react-calendar",
+  "version": "1.8.2",
   "description": "React component for AirJam&#x27;s Calendar component",
   "author": "mjlee1983",
   "license": "MIT",
-  "repository": "airjam-co/react-calendar-ci",
-  "main": "dist/react-calendar-ci.js",
+  "repository": "airjam-co/react-calendar",
+  "main": "dist/react-calendar.js",
   "types": "dist/index.d.ts",
   "type": "module",
-  "module": "dist/react-calendar-ci.modern.js",
+  "module": "dist/react-calendar.modern.js",
   "source": "src/index.tsx",
   "engines": {
     "node": ">=10"
