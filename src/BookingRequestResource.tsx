@@ -4,4 +4,5 @@ export interface BookingRequestResource {
   resource: BookingResource;
   startTimeUtc: Date;
   endTimeUtc: Date;
+  timezone: string;
 }

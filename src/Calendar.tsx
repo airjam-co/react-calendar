@@ -75,7 +75,8 @@ export const Calendar = ({
   mapMarkerLabelFunc,
   paymentProcessorPublicKey,
   renderMapMarkerInfoWindowFunc,
-  renderBookingResourcesSelectionFunc
+  renderBookingResourcesSelectionFunc,
+  renderResourceForSingularBookingFunc,
 }: Props) => {
   const [startTime, setStartTime] = useState<Date>(
     new Date(new Date().setHours(0, 0, 0, 0))
@@ -102,7 +103,7 @@ export const Calendar = ({
   const mapBoundNorthEast = React.useRef<Point | undefined>(undefined);
   const mapBoundSouthWest = React.useRef<Point | undefined>(undefined);
 
-  const startDate = showDate || undefined
+  const startDate = showDate || dailyBookStart || undefined
 
   const onChange = (newDate: Value) => {
     if (newDate) {
@@ -110,7 +111,7 @@ export const Calendar = ({
       setStartTime(newStartTime)
       if (onBookingStartTimeChanged) onBookingStartTimeChanged(newStartTime);
       if (isMounted) {
-        if (viewAs === ViewType.CalendarBook) {
+        if (viewAs === ViewType.CalendarBook || viewAs === ViewType.CalendarBookSelectResource) {
           fetchReservationAvailability(newStartTime)
         } else {
           fetchCalendarEvents(newStartTime)
@@ -133,11 +134,14 @@ export const Calendar = ({
       setDailyBookEnd(undefined);
       return;
     }
-    const newRangeStart = new Date(selectedDates[0] ? selectedDates[0] : "");
-    const newRangeEnd = new Date(selectedDates[1] ? selectedDates[1] : "");
-    console.log("Newly selected range: " + newRangeStart + " - " + newRangeEnd)
+    // For date range selections, we will ignore (ie. round down) anything below day mark
+    const newRangeStartRaw = new Date(selectedDates[0] ? selectedDates[0] : "");
+    const newRangeEndRaw = new Date(selectedDates[1] ? selectedDates[1] : "");
+    const newRangeStart = new Date(newRangeStartRaw.getFullYear(), newRangeStartRaw.getMonth(), newRangeStartRaw.getDate());
+    const newRangeEnd = new Date(newRangeEndRaw.getFullYear(), newRangeEndRaw.getMonth(), newRangeEndRaw.getDate());
     setDailyBookStart(newRangeStart)
     setDailyBookEnd(newRangeEnd)
+    startDate?.setDate(newRangeStart.getDate())
     if (onBookingStartTimeChanged) onBookingStartTimeChanged(newRangeStart);
     if (onBookingEndTimeChanged) onBookingEndTimeChanged(newRangeEnd);
   }
@@ -145,7 +149,7 @@ export const Calendar = ({
   const fetchDay = (newDate: Date) => {
     setStartTime(newDate)
       if (isMounted) {
-        if (viewAs === ViewType.CalendarBook) {
+        if (viewAs === ViewType.CalendarBook || viewAs === ViewType.CalendarBookSelectResource) {
           fetchReservationAvailability(newDate)
         } else {
           fetchCalendarEvents(newDate)
@@ -189,7 +193,7 @@ export const Calendar = ({
     priceMin, priceMax, customFilters, resultsPerPage])
 
   useEffect(() => {
-    if (viewAs === ViewType.CalendarBook) {
+    if (viewAs === ViewType.CalendarBook || viewAs === ViewType.CalendarBookSelectResource) {
       fetchDay(startTime);
     }
   }, [bookingResult])
@@ -226,13 +230,13 @@ export const Calendar = ({
     } else if (startDate) {
       if (showEndDate && viewAs && viewAs === ViewType.List) {
         fetchCalendarEvents(startDate, showEndDate)
-      } else if (viewAs === ViewType.CalendarBook) {
+      } else if (viewAs === ViewType.CalendarBook || viewAs === ViewType.CalendarBookSelectResource) {
         fetchReservationAvailability(startDate)
       } else {
         fetchCalendarEvents(startDate)
       }
     } else {
-      if (viewAs === ViewType.CalendarBook) {
+      if (viewAs === ViewType.CalendarBook || viewAs === ViewType.CalendarBookSelectResource) {
         fetchReservationAvailability(new Date(new Date().setHours(0, 0, 0, 0)))
       } else {
         fetchCalendarEvents(new Date(new Date().setHours(0, 0, 0, 0)))
@@ -425,6 +429,51 @@ export const Calendar = ({
     )
   }
 
+  const renderCalendarBookSelectResource = () => {
+    const dailyMode = availability && availability.resources && availability.resources.length ?
+      availability.resources.find(r => r.bookingUnit === CalendarBookingUnit.Daily) : false;
+
+    return (
+      <div className='calendar-view-container'>
+        <span className='calendar-block'>
+          <ReactCalendar
+            onChange={dailyMode ? onRangeChange : onChange}
+            locale={locale}
+            selectRange={dailyMode ? true : undefined}
+            allowPartialRange={dailyMode ? true : false}
+            defaultActiveStartDate={startDate || new Date()}
+            onActiveStartDateChange={({ action, activeStartDate, value, view }) => {
+              if (activeStartDate) {
+                const activeDate = new Date(activeStartDate);
+                fetchReservationAvailability(activeStartDate, addDays(activeStartDate, 31));
+                if (onCalendarMonthChanged) onCalendarMonthChanged(activeDate);
+              }
+            }}
+            defaultValue={startDate}
+          />
+        </span>
+        {renderAvailableTimes()}
+        <div className='timezone-selector-block'>
+          <div className='header'>{getTranslation(preferredTranslation, "time_zone")}</div>
+          {getTimezoneSelector(true)}
+        </div>
+        {bookingResult ? 
+          <ReservationSuccessModal
+            key={'reservation-success'}
+            timezone={timezone.toString()}
+            bookingResult={bookingResult}
+            locale={locale}
+            translation={preferredTranslation}
+            onClose={() => {
+              setBookingResult(undefined)
+            }}
+          /> : <span className="empty-modal"></span>}
+        {bookingDialog ? reserveDialog(bookingDialog) : <span className="empty-modal"></span>}
+      </div>
+
+    )
+  }
+
   const renderCalendarBook = () => {
     // TODO figure out a way to place dots on top of dates that have availability
     // When one or more resources are selectable in daily fashion, all are considered daily and the interface will show the daily one
@@ -471,6 +520,34 @@ export const Calendar = ({
       )
   }
 
+  const increaseDateByIncrementAndUnit = (originalDate: Date, increment: number, unit: TimeUnit) => {
+    const mutatedDate = new Date(originalDate);
+    switch (unit) {
+      case TimeUnit.YEARLY:
+        mutatedDate.setFullYear(mutatedDate.getFullYear() + increment);
+        break;
+      case TimeUnit.MONTHLY:
+        mutatedDate.setMonth(mutatedDate.getMonth() + increment);
+        break;
+      case TimeUnit.WEEKLY:
+        mutatedDate.setDate(mutatedDate.getDate() + increment * 7);
+        break;
+      case TimeUnit.DAILY:
+        mutatedDate.setDate(mutatedDate.getDate() + increment);
+        break;
+      case TimeUnit.HOURLY:
+        mutatedDate.setHours(mutatedDate.getHours() + increment);
+        break;
+      case TimeUnit.MINUTELY:
+        mutatedDate.setMinutes(mutatedDate.getMinutes() + increment);
+        break;
+      case TimeUnit.SECONDLY:
+        mutatedDate.setSeconds(mutatedDate.getSeconds() + increment);
+        break;
+    }
+    return mutatedDate;
+  }
+
   const renderCalendarDailyBook = () => {
     let chosenResource: BookingResource | undefined = undefined;
     if (availability && availability.resources && availability.resources.length > 0) {
@@ -488,30 +565,7 @@ export const Calendar = ({
       maxDate = new Date(chosenResource.availabilityEndTime);
     } else if (chosenResource.reservableUntilType === CalendarEventReservableUntilType.Duration && Number(chosenResource.reservableUntil) > 0) {
       const increment = Number(chosenResource.reservableUntil);
-      maxDate = new Date();
-      switch (chosenResource.reservableUntilUnit) {
-        case TimeUnit.YEARLY:
-          maxDate.setFullYear(maxDate.getFullYear() + increment);
-          break;
-        case TimeUnit.MONTHLY:
-          maxDate.setMonth(maxDate.getMonth() + increment);
-          break;
-        case TimeUnit.WEEKLY:
-          maxDate.setDate(maxDate.getDate() + increment * 7);
-          break;
-        case TimeUnit.DAILY:
-          maxDate.setDate(maxDate.getDate() + increment);
-          break;
-        case TimeUnit.HOURLY:
-          maxDate.setHours(maxDate.getHours() + increment);
-          break;
-        case TimeUnit.MINUTELY:
-          maxDate.setMinutes(maxDate.getMinutes() + increment);
-          break;
-        case TimeUnit.SECONDLY:
-          maxDate.setSeconds(maxDate.getSeconds() + increment);
-          break;
-      }
+      maxDate = increaseDateByIncrementAndUnit(new Date(), increment, chosenResource.reservableUntilUnit);
     }
     const canSelectPast = chosenResource.processPastEvents;
     let minDate: Date | undefined = canSelectPast ? undefined :new Date();
@@ -543,6 +597,14 @@ export const Calendar = ({
                 if (maxDate && date.getTime() > maxDate.getTime()) return true;
                 if (chosenResource) {
                   const beginOfDay = convertTimezoneOfDay(date, chosenResource.timezone);
+                  if (chosenResource.availableTimes && chosenResource.availableTimes.length > 0) {
+                    const availableIdx = chosenResource.availableTimes.findIndex(at => {
+                      const atDateStartTime = convertTimezoneOfDay(at.startTimeUtc, chosenResource!.timezone);
+                      const atDateEndTime = convertTimezoneOfDay(at.endTimeUtc, chosenResource!.timezone);
+                      return (atDateStartTime.getTime() <= beginOfDay.getTime()) && (atDateEndTime.getTime() >= beginOfDay.getTime());
+                    });
+                    if (availableIdx >= 0) return false;
+                  }
                   if (chosenResource.unavailableTimes && chosenResource.unavailableTimes.length > 0) {
                     const unavailableIdx = chosenResource.unavailableTimes.findIndex(ut => {
                       const utDateStartTime = convertTimezoneOfDay(ut.startTimeUtc, chosenResource!.timezone);
@@ -550,14 +612,6 @@ export const Calendar = ({
                       return (utDateStartTime.getTime() <= beginOfDay.getTime()) && (utDateEndTime.getTime() >= beginOfDay.getTime());
                     });
                     if (unavailableIdx >= 0) return true;
-                  }
-                  if (chosenResource.availableTimes && chosenResource.availableTimes.length > 0) {
-                    const availableIdx = chosenResource.availableTimes.findIndex(at => {
-                      const atDateStartTime = convertTimezoneOfDay(at.startTimeUtc, chosenResource!.timezone);
-                      const atDateEndTime = convertTimezoneOfDay(at.endTimeUtc, chosenResource!.timezone);
-                      return (atDateStartTime.getTime() <= beginOfDay.getTime()) && (atDateEndTime.getTime() >= beginOfDay.getTime());
-                    });
-                    if (availableIdx > 0) return false;
                   }
                 }
                 // unspecified time ranges are assumed to be available
@@ -580,6 +634,7 @@ export const Calendar = ({
                   resource: chosenResource,
                   startTimeUtc: dailyBookStart,
                   endTimeUtc: dailyBookEnd,
+                  timezone: timezone,
                 } as BookingRequestResource
                 setBookingDialog(newBooking);
               }}>Book</Button>
@@ -617,7 +672,7 @@ export const Calendar = ({
           <div className='header'>{getTranslation(preferredTranslation, "time_zone")}</div>
           {getTimezoneSelector(true)}
         </div>
-        {bookingResult ? 
+        {bookingResult ?
           <ReservationSuccessModal
             key={'reservation-success'}
             timezone={timezone.toString()}
@@ -635,12 +690,16 @@ export const Calendar = ({
 
   const renderAvailableTimes = () => {
     if (!availability || !availability.resources) return <div className='availabilities'><span className='empty'>There are no availabilities for the given time frame</span></div>;
+    const dailyMode = availability && availability.resources && availability.resources.length ?
+      availability.resources.find(r => r.bookingUnit === CalendarBookingUnit.Daily) : false;
     const availableTimes = <AvailabilitiesForADay
       timezone={timezone.toString()}
       availability={availability}
-      startTimeUtc={startTime}
+      startTimeUtc={dailyMode ? dailyBookStart : startTime}
+      endTimeUtc={dailyMode ? dailyBookEnd : undefined}
       locale={locale ? locale : "en-US"}
       translation={preferredTranslation}
+      renderResourceForSingularBookingFunc={renderResourceForSingularBookingFunc}
       onPress={(requestResource) => {
         setBookingDialog(requestResource);
       }}
@@ -1001,6 +1060,7 @@ export const Calendar = ({
     if (viewAs === ViewType.DayView) return renderDayList()
     if (viewAs === ViewType.DayViewByLocation) return renderDayCalendarByLocation()
     if (viewAs === ViewType.CalendarBook) return renderCalendarBook()
+    if (viewAs === ViewType.CalendarBookSelectResource) return renderCalendarBookSelectResource()
     if (viewAs === ViewType.MyResourcesList) return renderMyResources()
     if (viewAs === ViewType.MyReservationsList) return renderMyReservations()
     if (viewAs === ViewType.MyReservationRequestsList) return renderMyReservationRequests()

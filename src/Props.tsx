@@ -28,6 +28,7 @@ export interface Props {
   renderEventReservationFunc?: (reservation: EventReservation, index: number, acceptButton: React.JSX.Element, rejectButton: React.JSX.Element, cancelButton: React.JSX.Element) => any;
   renderMyReservationFunc?: (reservation: EventReservation, index: number, cancelButton: React.JSX.Element) => any;
   renderBookingResourcesSelectionFunc?: (resources: BookingResource[], setResourceFunc: (newResourceId: string) => void) => any;
+  renderResourceForSingularBookingFunc?: (resource: BookingResource, bookButton: React.JSX.Element, isAvailableToBook: boolean) => any;
   myReservationsHead?: React.JSX.Element;
   onPagePressed?: (newPage: number) => void;
   onResourceSelected?: (resource: PrivateCalendarResource) => void;

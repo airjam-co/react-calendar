@@ -9,24 +9,87 @@ import {
 } from '@airjam/types';
 import { BookingRequestResource } from './BookingRequestResource';
 import { Button } from 'react-bootstrap';
-import { msToHumanizedDuration } from './utilities';
+import { convertTimezoneOfDay, msToHumanizedDuration } from './utilities';
 
 interface Props {
   timezone: string;
   availability: CalendarBookingAvailability;
   locale: string;
   translation: Translation;
-  startTimeUtc: Date;
+  startTimeUtc?: Date;
+  endTimeUtc?: Date;
   onPress?: (dialogResource: BookingRequestResource) => void;
+  renderResourceForSingularBookingFunc?: (resource: BookingResource, bookButton: React.JSX.Element, isAvailableToBook: boolean) => any;
 }
 
-export const AvailabilitiesForADay = ({ availability, startTimeUtc, timezone, locale, translation, onPress }: Props) => {
+export const AvailabilitiesForADay = ({ availability, startTimeUtc, endTimeUtc, timezone, locale, translation, onPress, renderResourceForSingularBookingFunc }: Props) => {
   const [startTime, setStartTime] = React.useState<TimeRange | undefined>(undefined)
 
   React.useEffect(() => {});
 
   const renderAvailableTimes = () => {
+    const dailyMode = availability && availability.resources && availability.resources.length ?
+      availability.resources.find(r => r.bookingUnit === CalendarBookingUnit.Daily) : false;
+    const startTimeToUse = new Date(startTimeUtc ? startTimeUtc : "");
+    const endTimeToUse = new Date(endTimeUtc ? endTimeUtc : "");
     if (!availability || !availability.resources) return <div className='availabilities'><span className='empty'>The requested time frame has no available slots.</span></div>;
+    if (dailyMode && (!startTimeToUse || !endTimeUtc)) {
+      // do not process availabilities in this scenario
+      return <div className='availabilities'><span className='empty'>The requested time frame has no available slots.</span></div>;
+    }
+    const dailyModeBookableResources: {[resourceId: string]: boolean} = {};
+    if (dailyMode) {
+      availability.resources.forEach(r => {
+        const beginOfDay = convertTimezoneOfDay(startTimeToUse, r.timezone);
+        const beginOfEndDay = convertTimezoneOfDay(endTimeToUse, r.timezone);
+        if (r.availableTimes && r.availableTimes.length > 0) {
+          const availableIdx = r.availableTimes.findIndex(at => {
+            const atDateStartTime = convertTimezoneOfDay(at.startTimeUtc, r!.timezone);
+            const atDateEndTime = convertTimezoneOfDay(at.endTimeUtc, r!.timezone);
+            return (atDateStartTime.getTime() <= beginOfDay.getTime()) &&
+            (atDateEndTime.getTime() >= beginOfDay.getTime()) &&
+            (atDateStartTime.getTime() <= beginOfEndDay.getTime()) &&
+            (atDateEndTime.getTime() >= beginOfEndDay.getTime());
+          });
+          if (availableIdx >= 0) {
+            dailyModeBookableResources[r._id] = true;
+          }
+        }
+        if (r.unavailableTimes && r.unavailableTimes.length > 0) {
+          const unavailableIdx = r.unavailableTimes.findIndex(ut => {
+            const utDateStartTime = convertTimezoneOfDay(ut.startTimeUtc, r!.timezone);
+            const utDateEndTime = convertTimezoneOfDay(ut.endTimeUtc, r!.timezone);
+            return ((beginOfDay.getTime() >= utDateStartTime.getTime()) &&
+            (beginOfDay.getTime() <= utDateEndTime.getTime())) ||
+            ((beginOfEndDay.getTime() >= utDateStartTime.getTime()) &&
+            (beginOfEndDay.getTime() <= utDateEndTime.getTime()))
+          });
+          if (unavailableIdx >= 0) {
+            dailyModeBookableResources[r._id] = false;
+          }
+        }
+      });
+      return <div className='availabilities'>
+        {availability.resources.map(function (resource, idx) {
+          const bookingBtn = <Button className='reserve-slot-button' onClick={() => {
+              const newBooking = {
+                resource: resource,
+                startTimeUtc: startTimeToUse,
+                endTimeUtc: endTimeToUse,
+                timezone: timezone,
+              } as BookingRequestResource
+              if (onPress) onPress(newBooking)
+            }}>Book</Button>;
+          if (renderResourceForSingularBookingFunc) return renderResourceForSingularBookingFunc(resource, bookingBtn, dailyModeBookableResources[resource._id] ? true : false)
+          return <div className='availability-resource-container' key={'availability-resource-container-' + idx}>
+            <div className='availability-resource-name'>
+              {resource.name}
+            </div>
+            {dailyModeBookableResources[resource._id] ? bookingBtn : 'This resource is unavailable for booking'}
+            </div>
+        })}
+      </div>
+    }
     return <div className='availabilities'>
         <div className='availabilities-label'>{startTime ? getTranslation(translation, "select_end_time") : getTranslation(translation, "select_time_slot")}</div>
         {availability.resources.map(function (resource, idx) {
@@ -108,7 +171,8 @@ export const AvailabilitiesForADay = ({ availability, startTimeUtc, timezone, lo
     const dialogResource = {
         resource: resource,
         startTimeUtc: startTimeUtc,
-        endTimeUtc: slot.endTimeUtc
+        endTimeUtc: slot.endTimeUtc,
+        timezone: timezone,
       } as BookingRequestResource
     return <div key={key} className='availability-slot'>
       <Button className='reserve-slot-button' onClick={() => {
@@ -127,7 +191,8 @@ export const AvailabilitiesForADay = ({ availability, startTimeUtc, timezone, lo
     const dialogResource = {
         resource: resource,
         startTimeUtc: startTime.startTimeUtc,
-        endTimeUtc: endTimeUtc
+        endTimeUtc: endTimeUtc,
+        timezone: timezone
     } as BookingRequestResource
 
     return <div key={key} className='availability-slot'>

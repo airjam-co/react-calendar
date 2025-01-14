@@ -63,6 +63,7 @@ export const ReservationModalWrapper = ({
     requestPayload.resourceId = resource.resource._id;
     requestPayload.startTimeUtc = requestStartTime.toISOString();
     requestPayload.endTimeUtc = requestEndTime.toISOString();
+    requestPayload.timezone = timezone;
 
     setRequest(requestPayload);
     getReservationPaymentDetail(componentId, requestPayload, host, authToken).then(resp => {

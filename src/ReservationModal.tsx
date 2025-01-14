@@ -182,7 +182,7 @@ export const ReservationModal = ({
                 <Icon.Clock />
                 &nbsp;{
                   resource.resource.bookingUnit === CalendarBookingUnit.Daily ?
-                  msToHumanizedDuration(new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDay()).getTime() - new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDay()).getTime(), locale, ["y", "mo", "d"])
+                  msToHumanizedDuration(new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDate()).getTime() - new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate()).getTime(), locale, ["y", "mo", "d"])
                   :
                   msToHumanizedDuration(endTime.getTime() - startTime.getTime(), locale)
                 }
